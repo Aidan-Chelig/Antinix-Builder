@@ -49,6 +49,7 @@ groups = {
       text = ''
         ttyS0
         tty1
+        ttyAMA0
         console
       '';
       mode = "0644";
@@ -101,10 +102,9 @@ groups = {
 
     "/etc/pam.d/login" = {
       text = ''
-        auth       requisite  /usr/lib/security/pam_securetty.so
-        auth       required   /usr/lib/security/pam_unix.so
-        account    required   /usr/lib/security/pam_unix.so
-        session    sufficient /usr/lib/security/pam_permit.so
+auth       required   /usr/lib/security/pam_unix.so
+account    required   /usr/lib/security/pam_unix.so
+session    sufficient /usr/lib/security/pam_permit.so
       '';
       mode = "0644";
     };
