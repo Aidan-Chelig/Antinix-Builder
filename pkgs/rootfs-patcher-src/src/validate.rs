@@ -12,6 +12,10 @@ pub fn validate_root(root: &Path, cfg: &CompiledConfig) -> Result<()> {
         validate_no_absolute_store_symlinks(root, cfg)?;
     }
 
+    if cfg.raw.validation.forbid_absolute_internal_symlinks {
+        validate_no_absolute_internal_symlinks(root, cfg)?;
+    }
+
     if let Some(expected) = cfg.raw.validation.expected_interpreter.as_deref() {
         validate_expected_interpreter(root, cfg, expected)?;
     }
@@ -46,6 +50,73 @@ fn validate_no_absolute_store_symlinks(root: &Path, cfg: &CompiledConfig) -> Res
 
     if !bad.is_empty() {
         let mut msg = String::from("absolute /nix/store symlinks detected:\n");
+        for (rel, target) in bad {
+            msg.push_str(&format!("  {} -> {}\n", rel, target));
+        }
+        bail!(msg.trim_end().to_string());
+    }
+
+    Ok(())
+}
+
+fn validate_no_absolute_internal_symlinks(root: &Path, cfg: &CompiledConfig) -> Result<()> {
+    let roots = if cfg
+        .raw
+        .validation
+        .absolute_internal_symlink_scan_roots
+        .is_empty()
+    {
+        vec![
+            "/bin".to_string(),
+            "/sbin".to_string(),
+            "/lib".to_string(),
+            "/lib64".to_string(),
+            "/usr/bin".to_string(),
+            "/usr/sbin".to_string(),
+        ]
+    } else {
+        cfg.raw
+            .validation
+            .absolute_internal_symlink_scan_roots
+            .clone()
+    };
+
+    let mut bad = Vec::new();
+
+    for rel_root in roots {
+        let abs_root = root.join(rel_root.trim_start_matches('/'));
+        if !abs_root.exists() {
+            continue;
+        }
+
+        walk_all_paths(&abs_root, &mut |abs, _rel_unused| {
+            let rel = crate::paths::rel_from_root(root, abs)?;
+            if cfg.is_ignored(&rel) {
+                return Ok(());
+            }
+
+            let meta = fs::symlink_metadata(abs)
+                .with_context(|| format!("failed to lstat {}", abs.display()))?;
+
+            if !meta.file_type().is_symlink() {
+                return Ok(());
+            }
+
+            let target = fs::read_link(abs)
+                .with_context(|| format!("failed to read symlink {}", abs.display()))?;
+
+            let target_str = target.to_string_lossy();
+
+            if target_str.starts_with('/') && !target_str.starts_with(STORE_REF) {
+                bad.push((rel, target_str.into_owned()));
+            }
+
+            Ok(())
+        })?;
+    }
+
+    if !bad.is_empty() {
+        let mut msg = String::from("absolute internal symlinks detected:\n");
         for (rel, target) in bad {
             msg.push_str(&format!("  {} -> {}\n", rel, target));
         }

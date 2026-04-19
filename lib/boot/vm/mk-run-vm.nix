@@ -57,9 +57,6 @@ let
       ++ lib.optionals net [
         "rd.driver.pre=virtio_net"
       ]
-      ++ [
-        "init=/init"
-      ]
     else if guestIsAarch64 then
       [
         "console=${guestConsole}"
@@ -73,9 +70,6 @@ let
       ]
       ++ lib.optionals net [
         "rd.driver.pre=virtio_net"
-      ]
-      ++ [
-        "init=/init"
       ]
     else
       [ ];

@@ -9,6 +9,7 @@ let
     files = { };
     directories = { };
     symlinks = { };
+    imports = { };
 
     # System identity / defaults
     hostname = "localhost";
@@ -85,6 +86,16 @@ let
     }:
     {
       inherit mode user group;
+    };
+
+  mkImport =
+    {
+      source,
+      user ? "root",
+      group ? "root",
+    }:
+    {
+      inherit source user group;
     };
 
   mkUser =
@@ -186,6 +197,7 @@ in
     defaults
     mkFile
     mkDirectory
+    mkImport
     mkUser
     mkGroup
     mkTextPatch

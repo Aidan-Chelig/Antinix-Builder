@@ -142,9 +142,20 @@ in
     };
   };
 
-  symlinks = {
-    "/sbin/init" = "/usr/bin/busybox";
-  };
+symlinks = {
+  "/sbin/init" = "/usr/bin/busybox";
+  "/bin/busybox" = "/usr/bin/busybox";
+};
+
+  postBuild = [
+    ''
+      rm -f "$out/sbin/init"
+      ln -s /bin/busybox "$out/sbin/init"
+
+      rm -f "$out/bin/sh"
+      ln -s /bin/busybox "$out/bin/sh"
+    ''
+  ];
 
   runtime = {
     tmpfsDirs = [
@@ -165,4 +176,23 @@ in
   meta = {
     providesInit = true;
   };
+
+
+
 }
+
+# What I would change immediately
+# 1. Remove /init from busybox.nix
+#
+# Not right this second if you still need it for debugging, but conceptually it should go.
+#
+# 2. Prove whether the patcher is rewriting /sbin/init
+#
+# That’s the real question now.
+#
+# 3. If confirmed, fix it in the patcher or patcher config
+#
+# Likely by:
+#
+# excluding symlink rewrites for already-FHS-internal targets like /bin/busybox
+# or teaching the heuristic not to “upgrade” /bin/busybox to /usr/bin/busybox

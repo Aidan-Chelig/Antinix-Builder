@@ -11,6 +11,12 @@ pub struct ValidationConfig {
     pub forbid_absolute_store_symlinks: bool,
 
     #[serde(default)]
+    pub forbid_absolute_internal_symlinks: bool,
+
+    #[serde(default)]
+    pub absolute_internal_symlink_scan_roots: Vec<String>,
+
+    #[serde(default)]
     pub expected_interpreter: Option<String>,
 
     #[serde(default)]

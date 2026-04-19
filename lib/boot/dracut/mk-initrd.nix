@@ -197,6 +197,9 @@ runCommand name
       "$PWD/etc/dracut.conf.d" \
       "$PWD/bin"
 
+
+
+
     find_first_exe() {
       for p in "$@"; do
         if [ -x "$p" ]; then
@@ -350,12 +353,21 @@ EOF
     export DRACUT_INSTALL_PATH="$PATH"
     export dracutbasedir="${dracut}/lib/dracut"
 
+    MODULES_ROOT="$PWD/modules-root"
+    MODULES_DIR="$MODULES_ROOT/lib/modules/${kernelVersion}"
+
+    mkdir -p "$(dirname "$MODULES_DIR")"
+    cp -a "${moduleTree}/lib/modules/${kernelVersion}" "$MODULES_DIR"
+    chmod -R u+w "$MODULES_ROOT" 2>/dev/null || true
+
+    depmod -b "$MODULES_ROOT" "${kernelVersion}"
+
     ${dracut}/bin/dracut \
       --force \
       --verbose \
       ${lib.optionalString (!hostonly) "--no-hostonly \\"}
       --kver "${kernelVersion}" \
-      --kmoddir "${moduleTree}/lib/modules/${kernelVersion}" \
+      --kmoddir "$MODULES_DIR" \
       --include "$PWD/overlay" / \
       --conf /dev/null \
       --confdir "$PWD/etc/dracut.conf.d" \

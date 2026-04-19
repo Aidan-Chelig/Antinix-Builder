@@ -69,30 +69,22 @@ let
   mergedDirectories =
     generatedDirectories // (spec.directories or { });
 
-  packagesEnv =
-    buildEnv {
-      name = "${systemName}-packages-env";
-      paths = spec.packages or [ ];
-      pathsToLink = [
-        "/bin"
-        "/sbin"
-        "/lib"
-        "/lib64"
-        "/usr"
-        "/share"
-        "/etc"
-      ];
-      ignoreCollisions = true;
-    };
-
   baseTree =
     overlay.build {
       name = "${systemName}-base-tree";
-      inherit packagesEnv;
+      packagesEnv = null;
       files = mergedFiles;
       directories = mergedDirectories;
       symlinks = spec.symlinks or { };
+      imports = spec.imports or { };
     };
+
+  packageClosure =
+    pkgs.closureInfo {
+      rootPaths = spec.packages or [ ];
+    };
+
+  closurePathsFile = "${packageClosure}/store-paths";
 
   patcherConfigValue =
     patcherConfig.build {
@@ -120,13 +112,21 @@ runCommand "${systemName}-rootfs-tree"
 
     mkdir -p "$out"
     cp -a "${baseTree}/." "$out/"
+    chmod u+w "$out"
+    chmod -R u+w "$out" 2>/dev/null || true
+
+    "${rootfsPatcher}/bin/rootfs-patcher" merge \
+      --root "$out" \
+      --closure-paths-file "${closurePathsFile}" \
+      --data-dir share
 
     chmod u+w "$out"
     chmod -R u+w "$out" 2>/dev/null || true
 
     "${rootfsPatcher}/bin/rootfs-patcher" process \
       --root "$out" \
-      --config "${patcherConfigJson}"
+      --config "${patcherConfigJson}" \
+      --allowed-prefixes-file "${closurePathsFile}"
 
     ${lib.concatStringsSep "\n" (spec.postBuild or [ ])}
   ''

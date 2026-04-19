@@ -152,6 +152,7 @@ let
             files = recursiveAttrsMerge (a.files or { }) (b.files or { });
             directories = recursiveAttrsMerge (a.directories or { }) (b.directories or { });
             symlinks = recursiveAttrsMerge (a.symlinks or { }) (b.symlinks or { });
+            imports = recursiveAttrsMerge (a.imports or { }) (b.imports or { });
             users = mergeUsers (a.users or { }) (b.users or { });
             groups = mergeGroups (a.groups or { }) (b.groups or { });
           }

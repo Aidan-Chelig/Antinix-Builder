@@ -36,23 +36,17 @@
         hostSystem:
         if hostSystem == "x86_64-linux" then {
           guestSystem = "x86_64-linux";
-          kernelImage = null;
           kernelPath = "bzImage";
-          qemuAppName = "run-minimal-busybox-none-vm";
           console = "ttyS0";
         } else if hostSystem == "aarch64-linux" then {
           guestSystem = "aarch64-linux";
-          kernelImage = null;
           kernelPath = "Image";
-          qemuAppName = "run-minimal-busybox-none-vm";
           console = "ttyAMA0";
         } else
           throw "Unsupported host system: ${hostSystem}";
-
     in
     {
       libFor = libFor;
-
       lib = libFor "x86_64-linux";
 
       packages = forAllSystems
@@ -60,71 +54,164 @@
           let
             antinix = pkgs.callPackage ./lib/default.nix { };
 
-            minimal =
-              pkgs.callPackage ./examples/minimal-busybox-none.nix {
-                inherit antinix;
-              };
+            initNames =
+              builtins.filter
+                (n: !(lib.hasPrefix "override" n))
+                (builtins.attrNames antinix.initSystems);
+
+            packageManagerNames =
+              builtins.filter
+                (n: !(lib.hasPrefix "override" n))
+                (builtins.attrNames antinix.packageManagers);
 
             guestCfg = guestConfigFor pkgs.system;
-
             kernelPkg = pkgs.linuxPackages.kernel;
-
             kernelVersion = kernelPkg.modDirVersion or kernelPkg.version;
+            moduleTree = kernelPkg.modules;
+            kernelImage = "${kernelPkg}/${guestCfg.kernelPath}";
 
-            moduleTree = kernelPkg.dev;
+            mkVariant =
+              {
+                init,
+                packageManager,
+              }:
+              antinix.mkSystem {
+                name = "${packageManager}-${init}";
+                hostname = "antinix";
+                inherit init packageManager;
 
-            kernelImage =
-              if guestCfg.guestSystem == "x86_64-linux" then
-                "${kernelPkg}/${guestCfg.kernelPath}"
-              else
-                "${kernelPkg}/${guestCfg.kernelPath}";
+                buildTarball = true;
+                buildImage = true;
 
-initrd =
-  antinix.mkInitrd {
-    name = "minimal-busybox-none-initrd.img";
-    inherit
-      kernelVersion
-      moduleTree
-      ;
-  };
+                users = {
+                  root = antinix.schema.mkUser {
+                    isNormalUser = false;
+                    uid = 0;
+                    group = "root";
+                    home = "/root";
+                    shell = "/bin/sh";
+                    createHome = true;
+                    description = "root";
+                    hashedPassword = "<your test hash>";
+                  };
+                };
 
-            runVm =
-              antinix.mkRunVm {
-                name = guestCfg.qemuAppName;
-                rootfsImage = minimal.image;
-                inherit
-                  kernelImage
-                  initrd
-                  ;
-                hostSystem = pkgs.system;
-                guestSystem = guestCfg.guestSystem;
-kernelParams = [
-  "rd.debug"
-  "rd.shell"
-  "rd.break=initqueue"
-];
-                extraQemuArgs = [ ];
+                groups = {
+                  root = antinix.schema.mkGroup {
+                    gid = 0;
+                  };
+                };
+
+                files."/etc/issue" = antinix.schema.mkFile {
+                  text = ''
+                    antinix
+                    ${packageManager} + ${init}
+                  '';
+                  mode = "0644";
+                };
               };
-          in
-          {
-            minimal-busybox-none-rootfs = minimal.rootfs;
-            minimal-busybox-none-tarball = minimal.tarball;
-            minimal-busybox-none-image = minimal.image;
-            minimal-busybox-none-initrd = initrd;
-            minimal-busybox-none-vm = runVm;
-          });
 
-      apps = forAllSystems
-        (pkgs:
-          let
-            vm = self.packages.${pkgs.system}.minimal-busybox-none-vm;
+            mkVariantPackages =
+              init: packageManager:
+              let
+                variantName = "${packageManager}-${init}";
+                variant = mkVariant { inherit init packageManager; };
+
+                initrd =
+                  antinix.mkInitrd {
+                    name = "${variantName}-initrd.img";
+                    inherit kernelVersion moduleTree;
+                    extraDrivers = [
+                      "virtio_pci"
+                      "virtio_blk"
+                      "ext4"
+                      "virtio_net"
+                    ];
+                  };
+
+                vm =
+                  antinix.mkRunVm {
+                    name = "run-vm-${variantName}";
+                    rootfsImage = variant.image;
+                    inherit kernelImage initrd;
+                    hostSystem = pkgs.system;
+                    guestSystem = guestCfg.guestSystem;
+                    kernelParams = [ ];
+                    extraQemuArgs = [ ];
+                  };
+              in
+              [
+                {
+                  name = "rootfs-${variantName}";
+                  value = variant.rootfs;
+                }
+                {
+                  name = "tarball-${variantName}";
+                  value = variant.tarball;
+                }
+                {
+                  name = "image-${variantName}";
+                  value = variant.image;
+                }
+                {
+                  name = "initrd-${variantName}";
+                  value = initrd;
+                }
+                {
+                  name = "vm-${variantName}";
+                  value = vm;
+                }
+              ];
+
+allPackages =
+  lib.concatMap
+    (init:
+      lib.concatMap
+        (pm: mkVariantPackages init pm)
+        packageManagerNames
+    )
+    initNames;
+
           in
-          {
-            run-minimal-busybox-none-vm = {
-              type = "app";
-              program = "${vm}/bin/run-minimal-busybox-none-vm";
-            };
-          });
+builtins.listToAttrs allPackages
+        );
+
+apps = forAllSystems
+  (pkgs:
+    let
+      antinix = pkgs.callPackage ./lib/default.nix { };
+
+      initNames =
+        builtins.filter
+          (n: !(lib.hasPrefix "override" n))
+          (builtins.attrNames antinix.initSystems);
+
+      packageManagerNames =
+        builtins.filter
+          (n: !(lib.hasPrefix "override" n))
+          (builtins.attrNames antinix.packageManagers);
+
+      mkApp = init: packageManager:
+        let
+          variantName = "${packageManager}-${init}";
+          vm = self.packages.${pkgs.system}."vm-${variantName}";
+        in
+        {
+          name = "run-vm-${variantName}";
+          value = {
+            type = "app";
+            program = "${vm}/bin/run-vm-${variantName}";
+          };
+        };
+    in
+    builtins.listToAttrs (
+      lib.concatMap
+        (init:
+          map (pm: mkApp init pm) packageManagerNames
+        )
+        initNames
+    )
+  );
 
       formatter = forAllSystems (pkgs: pkgs.nixfmt-rfc-style);
     };

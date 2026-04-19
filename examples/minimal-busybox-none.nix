@@ -22,6 +22,7 @@ antinix.mkSystem {
       shell = "/bin/sh";
       createHome = true;
       description = "root";
+      hashedPassword = "$6$wP4WOkSH2cPLBH8w$jhyzYxkm5JHpO5x6vz8L5bbPXGLDAvixvJCSgq/YUlHPbIRPSHg45s3BlIk81prVwYp92sEpFuVh73oWt..jo0";
     };
   };
 

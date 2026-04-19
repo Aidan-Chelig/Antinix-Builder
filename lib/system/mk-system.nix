@@ -28,6 +28,8 @@ let
       Available package managers: ${lib.concatStringsSep ", " availablePackageManagers}
     '');
 
+
+
   baseFragmentFromArgs =
     {
       name ? null,
@@ -98,8 +100,33 @@ args@{
   ...
 }:
 let
-  initFragment = getInitFragment init;
-  packageManagerFragment = getPackageManagerFragment packageManager;
+  isCallableFragment =
+    fragment:
+    builtins.isFunction fragment || (builtins.isAttrs fragment && fragment ? __functor);
+
+  fragmentFunctionArgs =
+    fragment:
+    if builtins.isFunction fragment then
+      builtins.functionArgs fragment
+    else if builtins.isAttrs fragment && fragment ? __functionArgs then
+      fragment.__functionArgs
+    else
+      { };
+
+  fragmentContext = {
+    hostname = hostname;
+    console = "ttyS0";
+  };
+
+  realizeFragment =
+    fragment:
+    if isCallableFragment fragment then
+      fragment (builtins.intersectAttrs (fragmentFunctionArgs fragment) fragmentContext)
+    else
+      fragment;
+
+  initFragment = realizeFragment (getInitFragment init);
+  packageManagerFragment = realizeFragment (getPackageManagerFragment packageManager);
 
   userBaseFragment = baseFragmentFromArgs {
     inherit

@@ -148,7 +148,12 @@ let
         }) paths);
     in
     mkDirSet (
-      (runtime.tmpfsDirs or [ ])
+      [
+        "/proc"
+        "/sys"
+        "/dev"
+      ]
+      ++ (runtime.tmpfsDirs or [ ])
       ++ (runtime.stateDirs or [ ])
       ++ (runtime.dataDirs or [ ])
     );
@@ -188,6 +193,7 @@ in
     hostname
     packages
     symlinks
+    imports
     services
     runtime
     postBuild

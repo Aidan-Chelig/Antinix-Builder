@@ -7,6 +7,10 @@
   volumeLabel ? "rootfs",
 }:
 
+let
+  fsUuid = "11111111-1111-1111-1111-111111111111";
+  fakeTime = "1";
+in
 runCommand "${name}.img"
   {
     nativeBuildInputs = [
@@ -27,8 +31,12 @@ runCommand "${name}.img"
 
       truncate -s ${imageSize} "$out"
 
+      export E2FSPROGS_FAKE_TIME=${fakeTime}
+
       mke2fs \
         -L "${volumeLabel}" \
+        -U "${fsUuid}" \
+        -E "hash_seed=${fsUuid}" \
         -t ext4 \
         -d root \
         -F \

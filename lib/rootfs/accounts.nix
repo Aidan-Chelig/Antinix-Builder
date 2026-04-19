@@ -142,7 +142,7 @@ let
     }:
     # Fields:
     # login:passwd:lastchg:min:max:warn:inactive:expire:flag
-    "${name}:${passwordField}:0:0:99999:7:::";
+"${name}:${passwordField}:20000:0:99999:7:::";
 
   mkProfileText =
     {

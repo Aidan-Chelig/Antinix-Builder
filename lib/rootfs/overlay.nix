@@ -6,6 +6,43 @@ let
   normalizeRootfsPath = path:
     if lib.hasPrefix "/" path then path else "/${path}";
 
+  splitPath =
+    path:
+    builtins.filter (x: x != "") (lib.splitString "/" (normalizeRootfsPath path));
+
+  makeRelativeTarget =
+    from: to:
+    let
+      fromParts = splitPath from;
+      toParts = splitPath to;
+
+      fromDirParts =
+        if builtins.length fromParts == 0
+        then [ ]
+        else lib.sublist 0 ((builtins.length fromParts) - 1) fromParts;
+
+      commonLen =
+        let
+          maxLen = lib.min (builtins.length fromDirParts) (builtins.length toParts);
+
+          go =
+            i:
+            if i >= maxLen then
+              i
+            else if builtins.elemAt fromDirParts i == builtins.elemAt toParts i then
+              go (i + 1)
+            else
+              i;
+        in
+        go 0;
+
+      upCount = (builtins.length fromDirParts) - commonLen;
+      upParts = builtins.genList (_: "..") upCount;
+      downParts = lib.sublist commonLen ((builtins.length toParts) - commonLen) toParts;
+      relParts = upParts ++ downParts;
+    in
+    if relParts == [ ] then "." else lib.concatStringsSep "/" relParts;
+
   mkDirectorySnippet = relPath: dir:
     let
       path = normalizeRootfsPath relPath;
@@ -55,14 +92,29 @@ EOF
       ${modeLine}
     '';
 
-  mkSymlinkSnippet = relPath: target:
+  mkImportSnippet = relPath: imp:
     let
       path = normalizeRootfsPath relPath;
     in
     ''
       mkdir -p "$(dirname "$out${path}")"
       rm -rf "$out${path}"
-      ln -s ${q target} "$out${path}"
+      cp -aL ${q (toString imp.source)} "$out${path}"
+      chmod -R u+w "$out${path}" 2>/dev/null || true
+    '';
+
+  mkSymlinkSnippet = relPath: target:
+    let
+      path = normalizeRootfsPath relPath;
+      finalTarget =
+        if lib.hasPrefix "/" target && !lib.hasPrefix "/nix/store/" target
+        then makeRelativeTarget path target
+        else target;
+    in
+    ''
+      mkdir -p "$(dirname "$out${path}")"
+      rm -rf "$out${path}"
+      ln -s ${q finalTarget} "$out${path}"
     '';
 
   concatAttrSnippets = f: attrs:
@@ -73,10 +125,11 @@ in
   build =
     {
       name ? "rootfs-overlay",
-      packagesEnv,
+      packagesEnv ? null,
       files ? { },
       directories ? { },
       symlinks ? { },
+      imports ? { },
     }:
     runCommand name
       {
@@ -90,15 +143,16 @@ in
 
         mkdir -p "$out"
 
-        if [ -d "${packagesEnv}" ]; then
-          cp -a "${packagesEnv}/." "$out/"
-          chmod -R u+w "$out" 2>/dev/null || true
-        fi
+        ${lib.optionalString (packagesEnv != null) ''
+          if [ -d "${packagesEnv}" ]; then
+            cp -aL "${packagesEnv}/." "$out/"
+            chmod -R u+w "$out" 2>/dev/null || true
+          fi
+        ''}
 
         ${concatAttrSnippets mkDirectorySnippet directories}
-
         ${concatAttrSnippets mkFileSnippet files}
-
+        ${concatAttrSnippets mkImportSnippet imports}
         ${concatAttrSnippets mkSymlinkSnippet symlinks}
       '';
 }
