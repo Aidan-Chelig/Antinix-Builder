@@ -45,6 +45,19 @@ groups = {
 
   files = {
 
+"/etc/local.d/unix-chkpwd.start" = {
+  text = ''
+    #!/bin/sh
+    mkdir -p /run/wrappers/bin
+    if [ -e /usr/bin/unix_chkpwd ]; then
+      ln -sf /usr/bin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
+    elif [ -e /usr/sbin/unix_chkpwd ]; then
+      ln -sf /usr/sbin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
+    fi
+  '';
+  mode = "0755";
+};
+
     "/etc/securetty" = {
       text = ''
         ttyS0
@@ -240,6 +253,7 @@ symlinks = {
   "/sbin/openrc-run" = "/usr/bin/openrc-run";
   "/sbin/agetty" = "/usr/bin/agetty";
   "/bin/login" = "/usr/bin/login";
+  "/etc/runlevels/default/local" = "/etc/init.d/local";
 
   "/etc/init.d/agetty.${console}" = "/etc/init.d/agetty";
   "/etc/runlevels/default/agetty.${console}" = "/etc/init.d/agetty.${console}";
