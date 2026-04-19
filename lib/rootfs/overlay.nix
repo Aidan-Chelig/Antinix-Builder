@@ -99,7 +99,7 @@ EOF
     ''
       mkdir -p "$(dirname "$out${path}")"
       rm -rf "$out${path}"
-      cp -aL ${q (toString imp.source)} "$out${path}"
+      cp -a ${q (toString imp.source)} "$out${path}"
       chmod -R u+w "$out${path}" 2>/dev/null || true
     '';
 
@@ -150,9 +150,9 @@ in
           fi
         ''}
 
-        ${concatAttrSnippets mkDirectorySnippet directories}
-        ${concatAttrSnippets mkFileSnippet files}
-        ${concatAttrSnippets mkImportSnippet imports}
-        ${concatAttrSnippets mkSymlinkSnippet symlinks}
+${concatAttrSnippets mkDirectorySnippet directories}
+${concatAttrSnippets mkImportSnippet imports}
+${concatAttrSnippets mkFileSnippet files}
+${concatAttrSnippets mkSymlinkSnippet symlinks}
       '';
 }

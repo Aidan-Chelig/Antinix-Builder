@@ -115,6 +115,11 @@ runCommand "${systemName}-rootfs-tree"
     chmod u+w "$out"
     chmod -R u+w "$out" 2>/dev/null || true
 
+
+echo "=== pre-process agetty check ==="
+find "$out" \( -name agetty -o -name login \) -print 2>&1 || true
+ls -l "$out/usr/bin/agetty" "$out/usr/sbin/agetty" "$out/sbin/agetty" 2>&1 || true
+
     "${rootfsPatcher}/bin/rootfs-patcher" merge \
       --root "$out" \
       --closure-paths-file "${closurePathsFile}" \
@@ -122,6 +127,7 @@ runCommand "${systemName}-rootfs-tree"
 
     chmod u+w "$out"
     chmod -R u+w "$out" 2>/dev/null || true
+
 
     "${rootfsPatcher}/bin/rootfs-patcher" process \
       --root "$out" \

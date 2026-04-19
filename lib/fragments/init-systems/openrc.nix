@@ -17,7 +17,7 @@ let
 
   basePackages = [
     openrc
-    pkgs.util-linux
+    (pkgs.lib.getBin pkgs.util-linux)
     pkgs.procps
     pkgs.kbd
     pkgs.kmod
@@ -31,14 +31,29 @@ let
   ];
 
   extraTracePackages = lib.optionals enablePasswdTrace [ pkgs.strace ];
-
 in
 {
   name = "openrc-init";
 
   packages = basePackages ++ extraTracePackages;
 
+groups = {
+  uucp = {
+    gid = 14;
+  };
+};
+
   files = {
+
+    "/etc/securetty" = {
+      text = ''
+        ttyS0
+        tty1
+        console
+      '';
+      mode = "0644";
+    };
+
     "/etc/nsswitch.conf" = {
       text = ''
         passwd: files
@@ -133,30 +148,6 @@ in
       mode = "0644";
     };
 
-    "/etc/init.d" = {
-      source = "${openrc}/etc/init.d";
-    };
-
-    "/etc/runlevels" = {
-      source = "${openrc}/etc/runlevels";
-    };
-
-    "/etc/conf.d" = {
-      source = "${openrc}/etc/conf.d";
-    };
-
-    "/etc/pam.d" = {
-      source = "${openrc}/etc/pam.d";
-    };
-
-    "/etc/sysctl.d" = {
-      source = "${openrc}/etc/sysctl.d";
-    };
-
-    "/etc/local.d" = {
-      source = "${openrc}/etc/local.d";
-    };
-
     "/init" = {
       text = ''
         #!/bin/sh
@@ -217,58 +208,87 @@ in
     };
   };
 
-  symlinks = {
-    "/sbin/init" = "/usr/bin/openrc-init";
-    "/sbin/openrc" = "/usr/bin/openrc";
-    "/sbin/openrc-run" = "/usr/bin/openrc-run";
-    "/sbin/agetty" = "/usr/sbin/agetty";
-    "/bin/login" = "/usr/bin/login";
+  imports = {
+    "/etc/init.d" = {
+      source = "${openrc}/etc/init.d";
+    };
 
-    "/etc/init.d/agetty.${console}" = "/etc/init.d/agetty";
-    "/etc/runlevels/default/agetty.${console}" = "/etc/init.d/agetty.${console}";
-  }
-  // lib.optionalAttrs (console == "ttyS0") {
-    "/etc/init.d/agetty.tty1" = "/etc/init.d/agetty";
-    "/etc/runlevels/default/agetty.tty1" = "/etc/init.d/agetty.tty1";
-  };
+    "/etc/runlevels" = {
+      source = "${openrc}/etc/runlevels";
+    };
 
-  patching = {
-    textPatches = [
-      {
-        from = "${bin pkgs.shadow}/login";
-        to = "/usr/bin/login";
-        requireTargetExists = true;
-        targetKind = "executable";
-      }
-    ];
+    "/etc/conf.d" = {
+      source = "${openrc}/etc/conf.d";
+    };
 
-    binaryPatches = [
-      {
-        file = "/usr/bin/agetty";
-        from = "${bin pkgs.shadow}/login";
-        to = "/usr/bin/login";
-        requireTargetExists = true;
-        targetKind = "executable";
-      }
-      {
-        file = "/usr/sbin/agetty";
-        from = "${bin pkgs.shadow}/login";
-        to = "/usr/bin/login";
-        requireTargetExists = true;
-        targetKind = "executable";
-      }
-    ];
+    "/etc/pam.d" = {
+      source = "${openrc}/etc/pam.d";
+    };
 
-    elfPatches = [ ];
+    "/etc/sysctl.d" = {
+      source = "${openrc}/etc/sysctl.d";
+    };
 
-    ignore = {
-      globs = [
-        "/usr/share/terminfo/*"
-        "/usr/share/zoneinfo/*"
-        "/usr/share/keymaps/*"
-      ];
+    "/etc/local.d" = {
+      source = "${openrc}/etc/local.d";
     };
   };
+
+symlinks = {
+  "/sbin/init" = "/usr/bin/openrc-init";
+  "/sbin/openrc" = "/usr/bin/openrc";
+  "/sbin/openrc-run" = "/usr/bin/openrc-run";
+  "/sbin/agetty" = "/usr/bin/agetty";
+  "/bin/login" = "/usr/bin/login";
+
+  "/etc/init.d/agetty.${console}" = "/etc/init.d/agetty";
+  "/etc/runlevels/default/agetty.${console}" = "/etc/init.d/agetty.${console}";
+}
+// lib.optionalAttrs (console == "ttyS0") {
+  "/etc/init.d/agetty.tty1" = "/etc/init.d/agetty";
+  "/etc/runlevels/default/agetty.tty1" = "/etc/init.d/agetty.tty1";
+};
+
+
+
+patching = {
+  makeExecutable = [
+    "/init"
+    "/usr/local/bin/openrc-debug"
+  ]
+  ++ lib.optionals enablePasswdTrace [
+    "/usr/local/bin/passwd-trace"
+  ];
+
+  textPatches = [
+    {
+      from = "${bin pkgs.shadow}/login";
+      to = "/usr/bin/login";
+      requireTargetExists = true;
+      targetKind = "executable";
+    }
+  ];
+
+binaryPatches = [
+  {
+    file = "/usr/bin/agetty";
+    from = "${bin pkgs.shadow}/login";
+    to = "/usr/bin/login";
+    requireTargetExists = true;
+    targetKind = "executable";
+  }
+];
+
+  elfPatches = [ ];
+
+  ignore = {
+    globs = [
+      "/usr/share/terminfo/*"
+      "/usr/share/zoneinfo/*"
+      "/usr/share/keymaps/*"
+    ];
+  };
+};
 
   postBuild = [
     ''
@@ -276,7 +296,7 @@ in
       chmod u+w "$out/usr/bin/sysctl" || true
 
       rm -f "$out/bin/sysctl"
-      ln -s /usr/bin/sysctl "$out/bin/sysctl"
+      ln -s ../usr/bin/sysctl "$out/bin/sysctl"
 
       mkdir -p \
         "$out/debug" \

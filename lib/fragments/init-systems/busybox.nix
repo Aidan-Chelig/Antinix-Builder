@@ -177,6 +177,16 @@ symlinks = {
     providesInit = true;
   };
 
+patching = {
+  makeExecutable = [
+    "/init"
+    "/etc/init.d/rcS"
+  ]
+  ++ lib.optionals enablePasswdTrace [
+    "/usr/local/bin/passwd-trace"
+  ];
+};
+
 
 
 }

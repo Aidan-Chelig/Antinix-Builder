@@ -108,8 +108,6 @@ let
 
   defaultChmod = {
     make_executable = [
-      "/init"
-      "/etc/init.d/rcS"
     ];
   };
 
