@@ -1,0 +1,190 @@
+{ lib }:
+
+let
+  defaults = {
+    name = null;
+
+    # Core content
+    packages = [ ];
+    files = { };
+    directories = { };
+    symlinks = { };
+
+    # System identity / defaults
+    hostname = "localhost";
+    motd = null;
+    environment = { };
+
+    # Users and groups
+    users = { };
+    groups = { };
+
+    # Service-ish / boot-ish configuration
+    services = { };
+    runtime = {
+      tmpfsDirs = [ "/tmp" "/run" ];
+      stateDirs = [ "/var/lib" "/var/log" ];
+      dataDirs = [ "/srv" ];
+    };
+
+    # Shell hooks or build hooks to be interpreted downstream
+    postBuild = [ ];
+
+    # Advanced escape hatches
+    patching = {
+      # Simple string-for-string text rewrites
+      textRewrites = { };
+
+      # Richer patch phases for compatibility with the older API
+      textPatches = [ ];
+      binaryPatches = [ ];
+      elfPatches = [ ];
+
+      extraSearchPaths = [ ];
+
+      ignore = {
+        paths = [ ];
+        suffixes = [ ];
+        extensions = [ ];
+        globs = [ ];
+      };
+
+      runtime = {
+        normalizeStorePaths = true;
+        rewriteInterpreter = true;
+      };
+    };
+
+    validation = {
+      forbidStoreReferences = true;
+      allowMissing = [ ];
+      strict = true;
+    };
+
+    meta = { };
+  };
+
+  mkFile =
+    {
+      source ? null,
+      text ? null,
+      mode ? null,
+      user ? "root",
+      group ? "root",
+    }:
+    assert (source != null) != (text != null);
+    {
+      inherit source text mode user group;
+    };
+
+  mkDirectory =
+    {
+      mode ? "0755",
+      user ? "root",
+      group ? "root",
+    }:
+    {
+      inherit mode user group;
+    };
+
+  mkUser =
+    {
+      isNormalUser ? true,
+      uid ? null,
+      group ? null,
+      extraGroups ? [ ],
+      home ? null,
+      shell ? "/bin/sh",
+      password ? null,
+      hashedPassword ? null,
+      createHome ? true,
+      description ? "",
+    }:
+    assert ! (password != null && hashedPassword != null);
+    {
+      inherit
+        isNormalUser
+        uid
+        group
+        extraGroups
+        home
+        shell
+        password
+        hashedPassword
+        createHome
+        description
+        ;
+    };
+
+  mkGroup =
+    {
+      gid ? null,
+    }:
+    {
+      inherit gid;
+    };
+
+  mkTextPatch =
+    {
+      from,
+      to,
+      requireTargetExists ? false,
+      targetKind ? null,
+    }:
+    {
+      inherit
+        from
+        to
+        requireTargetExists
+        targetKind
+        ;
+    };
+
+  mkBinaryPatch =
+    {
+      from,
+      to,
+      requireTargetExists ? false,
+      targetKind ? null,
+    }:
+    {
+      inherit
+        from
+        to
+        requireTargetExists
+        targetKind
+        ;
+    };
+
+  mkElfPatch =
+    {
+      from,
+      to,
+      requireTargetExists ? false,
+      targetKind ? null,
+    }:
+    {
+      inherit
+        from
+        to
+        requireTargetExists
+        targetKind
+        ;
+    };
+
+  isFragment = value: lib.isAttrs value;
+
+in
+{
+  inherit
+    defaults
+    mkFile
+    mkDirectory
+    mkUser
+    mkGroup
+    mkTextPatch
+    mkBinaryPatch
+    mkElfPatch
+    isFragment
+    ;
+}
