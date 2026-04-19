@@ -1,0 +1,318 @@
+use crate::fs_walk::collect_files;
+use crate::model::CompiledConfig;
+use crate::paths::normalize_rel_string;
+use anyhow::{Context, Result, bail};
+use goblin::Object;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+pub fn normalize_runtime_layout(root: &Path, cfg: &CompiledConfig) -> Result<()> {
+    let rl = &cfg.raw.runtime_layout;
+    if !rl.normalize_runtime_layout {
+        return Ok(());
+    }
+
+    let detected = detect_interpreter(root, cfg)?.with_context(
+        || "runtime layout normalization requested, but no ELF interpreter could be detected",
+    )?;
+
+    rebuild_runtime_dirs(root, rl.lib_roots.as_slice(), "/lib")?;
+    rebuild_runtime_dirs(root, rl.lib64_roots.as_slice(), "/lib64")?;
+
+    if let Some(dest_dir) = rl.install_detected_interpreter_to.as_deref() {
+        install_detected_interpreter(root, &detected, dest_dir)?;
+    }
+
+    Ok(())
+}
+
+fn detect_interpreter(root: &Path, cfg: &CompiledConfig) -> Result<Option<String>> {
+    let rl = &cfg.raw.runtime_layout;
+
+    for rel in &rl.detect_interpreter_from {
+        let rel = normalize_rel_string(rel);
+        let abs = root.join(rel.trim_start_matches('/'));
+
+        if !abs.exists() {
+            continue;
+        }
+
+        if let Some(interp) = interpreter_from_path(&abs)? {
+            return Ok(Some(interp));
+        }
+    }
+
+    let fallback_roots = if !rl.interpreter_fallback_scan_roots.is_empty() {
+        rl.interpreter_fallback_scan_roots.clone()
+    } else {
+        vec![
+            "/bin".to_string(),
+            "/sbin".to_string(),
+            "/usr/bin".to_string(),
+            "/usr/sbin".to_string(),
+        ]
+    };
+
+    let files = collect_files(root, &fallback_roots, cfg)?;
+    for (abs, _rel) in files {
+        if let Some(interp) = interpreter_from_path(&abs)? {
+            return Ok(Some(interp));
+        }
+    }
+
+    Ok(None)
+}
+
+fn interpreter_from_path(path: &Path) -> Result<Option<String>> {
+    let bytes = fs::read(path).with_context(|| format!("failed to read {}", path.display()))?;
+    let elf = match Object::parse(&bytes) {
+        Ok(Object::Elf(elf)) => elf,
+        _ => return Ok(None),
+    };
+
+    Ok(elf.interpreter.map(|s| s.to_string()))
+}
+
+fn rebuild_runtime_dirs(root: &Path, sources: &[String], dest_rel: &str) -> Result<()> {
+    let dest_rel = normalize_rel_string(dest_rel);
+    let dest_abs = root.join(dest_rel.trim_start_matches('/'));
+
+    if dest_abs.exists() {
+        let meta = fs::symlink_metadata(&dest_abs)
+            .with_context(|| format!("failed to stat {}", dest_abs.display()))?;
+        if meta.file_type().is_dir() && !meta.file_type().is_symlink() {
+            fs::remove_dir_all(&dest_abs)
+                .with_context(|| format!("failed to remove {}", dest_abs.display()))?;
+        } else {
+            fs::remove_file(&dest_abs)
+                .with_context(|| format!("failed to remove {}", dest_abs.display()))?;
+        }
+    }
+
+    fs::create_dir_all(&dest_abs)
+        .with_context(|| format!("failed to create {}", dest_abs.display()))?;
+
+    for src_rel in sources {
+        let src_rel = normalize_rel_string(src_rel);
+        let src_abs = root.join(src_rel.trim_start_matches('/'));
+
+        if !src_abs.exists() {
+            continue;
+        }
+
+        let meta = fs::symlink_metadata(&src_abs)
+            .with_context(|| format!("failed to stat {}", src_abs.display()))?;
+
+        if !meta.file_type().is_dir() {
+            bail!(
+                "runtime layout source is not a directory: {}",
+                src_abs.display()
+            );
+        }
+
+        copy_dir_contents_dereference(&src_abs, &dest_abs)?;
+    }
+
+    Ok(())
+}
+
+fn resolve_detected_interpreter_source(root: &Path, detected: &str) -> Result<PathBuf> {
+    let detected_path = Path::new(detected);
+
+    // Match previous Nix behavior first:
+    // patchelf --print-interpreter returned a host path, often in /nix/store,
+    // and the shell copied that path directly into the rootfs.
+    if detected_path.is_absolute() && detected_path.exists() {
+        return Ok(detected_path.to_path_buf());
+    }
+
+    // Fallback: allow rootfs-relative resolution too, in case we ever detect
+    // an already-normalized interpreter like /lib64/ld-linux-...
+    let detected_rel = normalize_rel_string(detected);
+    let in_root = root.join(detected_rel.trim_start_matches('/'));
+    if in_root.exists() {
+        return Ok(in_root);
+    }
+
+    anyhow::bail!(
+        "detected interpreter could not be resolved as either a host path or a rootfs path: {}",
+        detected
+    );
+}
+
+fn install_detected_interpreter(root: &Path, detected: &str, dest_dir_rel: &str) -> Result<()> {
+    let src_abs = resolve_detected_interpreter_source(root, detected)?;
+
+    let dest_dir_rel = normalize_rel_string(dest_dir_rel);
+    let dest_dir_abs = root.join(dest_dir_rel.trim_start_matches('/'));
+    fs::create_dir_all(&dest_dir_abs)
+        .with_context(|| format!("failed to create {}", dest_dir_abs.display()))?;
+
+    let base = Path::new(detected)
+        .file_name()
+        .map(|x| x.to_string_lossy().into_owned())
+        .with_context(|| format!("detected interpreter has no basename: {detected}"))?;
+
+    let dest_abs = dest_dir_abs.join(base);
+    copy_entry_dereference(&src_abs, &dest_abs)
+        .with_context(|| format!("failed to install interpreter into {}", dest_abs.display()))?;
+
+    Ok(())
+}
+
+fn copy_dir_contents_dereference(src_dir: &Path, dest_dir: &Path) -> Result<()> {
+    fs::create_dir_all(dest_dir)
+        .with_context(|| format!("failed to create {}", dest_dir.display()))?;
+
+    for entry in fs::read_dir(src_dir)
+        .with_context(|| format!("failed to read directory {}", src_dir.display()))?
+    {
+        let entry =
+            entry.with_context(|| format!("failed to read entry in {}", src_dir.display()))?;
+        let src = entry.path();
+        let name = entry.file_name();
+        let dest = dest_dir.join(name);
+
+        copy_entry_dereference(&src, &dest)?;
+    }
+
+    Ok(())
+}
+
+fn copy_entry_dereference(src: &Path, dest: &Path) -> Result<()> {
+    let meta =
+        fs::symlink_metadata(src).with_context(|| format!("failed to lstat {}", src.display()))?;
+
+    if meta.file_type().is_symlink() {
+        let target_meta = fs::metadata(src)
+            .with_context(|| format!("failed to stat symlink target {}", src.display()))?;
+
+        if target_meta.is_dir() {
+            if dest.exists() {
+                remove_path(dest)?;
+            }
+            fs::create_dir_all(dest)
+                .with_context(|| format!("failed to create {}", dest.display()))?;
+            copy_dir_recursive_follow(src, dest)?;
+            make_writable_recursive(dest)?;
+        } else {
+            if let Some(parent) = dest.parent() {
+                fs::create_dir_all(parent)
+                    .with_context(|| format!("failed to create {}", parent.display()))?;
+            }
+            if dest.exists() {
+                remove_path(dest)?;
+            }
+            fs::copy(src, dest).with_context(|| {
+                format!(
+                    "failed to copy symlink target {} -> {}",
+                    src.display(),
+                    dest.display()
+                )
+            })?;
+            make_writable(dest)?;
+        }
+
+        return Ok(());
+    }
+
+    if meta.is_dir() {
+        if dest.exists() {
+            let dest_meta = fs::symlink_metadata(dest)
+                .with_context(|| format!("failed to stat {}", dest.display()))?;
+            if dest_meta.file_type().is_dir() && !dest_meta.file_type().is_symlink() {
+                copy_dir_contents_dereference(src, dest)?;
+                make_writable_recursive(dest)?;
+                return Ok(());
+            }
+            remove_path(dest)?;
+        }
+
+        fs::create_dir_all(dest).with_context(|| format!("failed to create {}", dest.display()))?;
+        copy_dir_contents_dereference(src, dest)?;
+        make_writable_recursive(dest)?;
+        return Ok(());
+    }
+
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create {}", parent.display()))?;
+    }
+
+    if dest.exists() {
+        remove_path(dest)?;
+    }
+
+    fs::copy(src, dest)
+        .with_context(|| format!("failed to copy {} -> {}", src.display(), dest.display()))?;
+    make_writable(dest)?;
+    Ok(())
+}
+
+fn copy_dir_recursive_follow(src_dir: &Path, dest_dir: &Path) -> Result<()> {
+    fs::create_dir_all(dest_dir)
+        .with_context(|| format!("failed to create {}", dest_dir.display()))?;
+
+    for entry in fs::read_dir(src_dir)
+        .with_context(|| format!("failed to read directory {}", src_dir.display()))?
+    {
+        let entry =
+            entry.with_context(|| format!("failed to read entry in {}", src_dir.display()))?;
+        let src = entry.path();
+        let name = entry.file_name();
+        let dest = dest_dir.join(name);
+
+        copy_entry_dereference(&src, &dest)?;
+    }
+
+    Ok(())
+}
+
+fn remove_path(path: &Path) -> Result<()> {
+    let meta =
+        fs::symlink_metadata(path).with_context(|| format!("failed to stat {}", path.display()))?;
+
+    if meta.file_type().is_dir() && !meta.file_type().is_symlink() {
+        fs::remove_dir_all(path).with_context(|| format!("failed to remove {}", path.display()))?;
+    } else {
+        fs::remove_file(path).with_context(|| format!("failed to remove {}", path.display()))?;
+    }
+
+    Ok(())
+}
+
+fn make_writable(path: &Path) -> Result<()> {
+    let meta = fs::metadata(path).with_context(|| format!("failed to stat {}", path.display()))?;
+    let mut perms = meta.permissions();
+    if perms.readonly() {
+        perms.set_readonly(false);
+        fs::set_permissions(path, perms)
+            .with_context(|| format!("failed to set permissions on {}", path.display()))?;
+    }
+    Ok(())
+}
+
+fn make_writable_recursive(root: &Path) -> Result<()> {
+    if !root.exists() {
+        return Ok(());
+    }
+
+    make_writable(root)?;
+
+    for entry in fs::read_dir(root)
+        .with_context(|| format!("failed to read directory {}", root.display()))?
+    {
+        let entry = entry.with_context(|| format!("failed to read entry in {}", root.display()))?;
+        let path = entry.path();
+        let meta = fs::symlink_metadata(&path)
+            .with_context(|| format!("failed to stat {}", path.display()))?;
+
+        if meta.file_type().is_dir() && !meta.file_type().is_symlink() {
+            make_writable_recursive(&path)?;
+        } else {
+            make_writable(&path)?;
+        }
+    }
+
+    Ok(())
+}

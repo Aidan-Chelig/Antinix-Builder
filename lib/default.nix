@@ -30,7 +30,7 @@ let
     pkgs.callPackage ./rootfs/patcher-config.nix { };
 
   rootfsPatcher =
-    pkgs.callPackage ../rootfs/rootfs-patcher.nix { };
+    pkgs.callPackage ../pkgs/rootfs-patcher.nix { };
 
   mkRootfsTree =
     pkgs.callPackage ./rootfs/mk-rootfs-tree.nix {
@@ -55,7 +55,7 @@ let
     pkgs.callPackage ./boot/dracut/overlay-spec.nix { };
 
   dracutShellParser =
-    pkgs.callPackage ./boot/dracut/shell-parser.nix { };
+    pkgs.callPackage ../pkgs/dracut-shell-parser.nix { };
 
   mkOverlayReport =
     args:

@@ -7,7 +7,6 @@
   dinit = pkgs.callPackage ./dinit.nix { };
   s6 = pkgs.callPackage ./s6.nix { };
   openrc = pkgs.callPackage ./openrc.nix {
-    #TODO point at openrc packagel like   openrc = pkgs.callPackage ../../../path/to/your/openrc-package.nix { };
-    openrc = pkgs.openrc;
+     openrc = pkgs.callPackage ../../../pkgs/openrc.nix { };
   };
 }

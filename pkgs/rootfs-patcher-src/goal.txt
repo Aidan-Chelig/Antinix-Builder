@@ -1,0 +1,12 @@
+A rootfs pipeline that can:
+
+merge a Nix runtime closure into an FHS tree
+normalize runtime layout
+patch ELF metadata
+rewrite embedded store paths
+detect wrapped public entrypoints
+import real leaves from the closure
+repatch imported ELFs
+apply runtime-family wrappers
+emit debug artifacts
+enforce a hard no-store-refs invariant for public/imported ELF metadata

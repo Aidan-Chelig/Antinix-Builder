@@ -1,0 +1,22 @@
+[package]
+name = "rootfs-patcher"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aho-corasick = "1.1.4"
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+content_inspector = "0.2"
+globset = "0.4"
+goblin = "0.10.5"
+ignore = "0.4.25"
+memchr = "2"
+patchelf = "0.2.1"
+
+rayon = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[patch.crates-io]
+patchelf = { git = "https://github.com/Aidan-Chelig/patchelf-rs" }
