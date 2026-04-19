@@ -9,17 +9,46 @@
 }:
 
 let
+  sortNames = attrs:
+    builtins.sort builtins.lessThan (builtins.attrNames attrs);
+
+  inferGroupGids =
+    groups':
+    let
+      names = sortNames groups';
+      step =
+        state: groupName:
+        let
+          group = groups'.${groupName};
+          gid =
+            if builtins.isInt (group.gid or null)
+            then group.gid
+            else if groupName == "root"
+            then 0
+            else state.nextGid;
+          nextGid =
+            if builtins.isInt (group.gid or null)
+            then builtins.max state.nextGid (group.gid + 1)
+            else if groupName == "root"
+            then state.nextGid
+            else state.nextGid + 1;
+        in
+        {
+          nextGid = nextGid;
+          gids = state.gids // {
+            "${groupName}" = gid;
+          };
+        };
+    in
+    (lib.foldl' step { nextGid = 1000; gids = { root = 0; }; } names).gids;
+
+  groupGids = inferGroupGids groups;
+
   resolvePrimaryGroupName = userName: cfg:
     cfg.group or (if userName == "root" then "root" else userName);
 
   resolveGid = groupName:
-    let
-      group = groups.${groupName} or (throw "rootfs-tarball.nix: unknown group `${groupName}`");
-    in
-    if builtins.isInt (group.gid or null) then
-      group.gid
-    else
-      throw "rootfs-tarball.nix: group `${groupName}` must have a concrete integer gid";
+    groupGids.${groupName} or (throw "rootfs-tarball.nix: unknown group `${groupName}`");
 
   ownershipCommands =
     lib.concatStringsSep "\n" (

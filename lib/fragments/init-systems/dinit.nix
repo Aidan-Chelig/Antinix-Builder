@@ -9,8 +9,9 @@
 
 let
   basePackages = [
-    pkgs.busybox
+    pkgs.dinit
     pkgs.util-linux
+    pkgs.inetutils
     (pkgs.lib.getBin pkgs.shadow)
     pkgs.pam
     pkgs.libxcrypt
@@ -20,67 +21,11 @@ let
 
 in
 {
-  name = "busybox-init";
+  name = "dinit-init";
 
   packages = basePackages ++ extraTracePackages;
 
   files = {
-    "/etc/inittab" = {
-      text = ''
-        ::sysinit:/etc/init.d/rcS
-        ${console}::respawn:/usr/bin/agetty -L ${console} 115200 vt100 -l /usr/bin/login
-        ::ctrlaltdel:/bin/reboot
-        ::shutdown:/bin/umount -a -r
-        ::shutdown:/bin/swapoff -a
-      '';
-      mode = "0644";
-    };
-
-    "/etc/init.d/rcS" = {
-      text = ''
-        #!/bin/sh
-        set -eu
-
-        export HOME=/root
-        export USER=root
-        export LOGNAME=root
-        export SHELL=/bin/sh
-        export PATH=/bin:/usr/bin:/sbin:/usr/sbin
-        export TERM="''${TERM:-linux}"
-        export TERMINFO_DIRS="''${TERMINFO_DIRS:-/lib/terminfo:/usr/share/terminfo:/usr/lib/terminfo}"
-
-        mount -t proc proc /proc || true
-        mount -t sysfs sysfs /sys || true
-        mount -t devtmpfs devtmpfs /dev || true
-        mount -t tmpfs tmpfs /run || true
-
-        mkdir -p /run/wrappers/bin
-
-        [ -e /dev/null ] || mknod -m 666 /dev/null c 1 3
-        [ -e /dev/zero ] || mknod -m 666 /dev/zero c 1 5
-        [ -e /dev/tty ] || mknod -m 666 /dev/tty c 5 0
-        [ -e /dev/console ] || mknod -m 600 /dev/console c 5 1
-
-        if [ -e /usr/bin/unix_chkpwd ]; then
-          ln -sf /usr/bin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
-        elif [ -e /usr/sbin/unix_chkpwd ]; then
-          ln -sf /usr/sbin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
-        fi
-
-        if [ -f /etc/hostname ]; then
-          /usr/bin/hostname "$(cat /etc/hostname)" || true
-        fi
-
-        ${lib.optionalString debug ''
-          echo "[busybox-init debug] dropping to shell"
-          /bin/sh -i
-        ''}
-
-        exit 0
-      '';
-      mode = "0755";
-    };
-
     "/etc/login.defs" = {
       text = ''
         MAIL_DIR        /var/mail
@@ -123,11 +68,75 @@ in
       mode = "0644";
     };
 
+    "/etc/dinit.d/boot" = {
+      text = ''
+        type = internal
+        waits-for.d = boot.d
+      '';
+      mode = "0644";
+    };
+
+    "/etc/dinit.d/getty" = {
+      text = ''
+        type = process
+        command = /usr/bin/agetty -L 115200 ${console} vt100 -l /usr/bin/login
+        smooth-recovery = true
+      '';
+      mode = "0644";
+    };
+
     "/init" = {
       text = ''
         #!/bin/sh
+        set -eu
+
+        export HOME=/root
+        export USER=root
+        export LOGNAME=root
+        export SHELL=/bin/sh
         export PATH=/bin:/usr/bin:/sbin:/usr/sbin
-        exec /sbin/init
+        export TERM="''${TERM:-linux}"
+        export TERMINFO_DIRS="''${TERMINFO_DIRS:-/lib/terminfo:/usr/share/terminfo:/usr/lib/terminfo}"
+
+        mount -t proc proc /proc || true
+        mount -t sysfs sysfs /sys || true
+        mount -t devtmpfs devtmpfs /dev || true
+        mount -t tmpfs tmpfs /run || true
+
+        mkdir -p /run/wrappers/bin
+        mkdir -p /etc/dinit.d/boot.d
+
+        [ -e /dev/null ] || mknod -m 666 /dev/null c 1 3
+        [ -e /dev/zero ] || mknod -m 666 /dev/zero c 1 5
+        [ -e /dev/tty ] || mknod -m 666 /dev/tty c 5 0
+        [ -e /dev/console ] || mknod -m 600 /dev/console c 5 1
+
+        if [ -e /usr/bin/unix_chkpwd ]; then
+          ln -sf /usr/bin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
+        elif [ -e /usr/sbin/unix_chkpwd ]; then
+          ln -sf /usr/sbin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
+        fi
+
+        if [ -f /etc/hostname ]; then
+          /usr/bin/hostname "$(cat /etc/hostname)" || true
+        fi
+
+        ln -snf /etc/dinit.d/getty /etc/dinit.d/boot.d/getty
+
+        ${lib.optionalString debug ''
+          echo "[dinit debug] ls -la /etc/dinit.d"
+          ls -la /etc/dinit.d || true
+          echo "[dinit debug] ls -la /etc/dinit.d/boot.d"
+          ls -la /etc/dinit.d/boot.d || true
+          echo "[dinit debug] cat /etc/dinit.d/boot"
+          cat /etc/dinit.d/boot || true
+          echo "[dinit debug] cat /etc/dinit.d/getty"
+          cat /etc/dinit.d/getty || true
+          /bin/sh -i
+        ''}
+
+        echo "[dinit] boot complete, starting dinit"
+        exec /usr/bin/dinit --service boot
       '';
       mode = "0755";
     };
@@ -143,7 +152,7 @@ in
   };
 
   symlinks = {
-    "/sbin/init" = "/usr/bin/busybox";
+    "/sbin/init" = "/init";
   };
 
   runtime = {
@@ -159,7 +168,7 @@ in
   };
 
   services = {
-    init.name = "busybox";
+    init.name = "dinit";
   };
 
   meta = {

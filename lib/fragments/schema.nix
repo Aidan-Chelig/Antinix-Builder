@@ -128,6 +128,7 @@ let
     {
       from,
       to,
+      file ? null,
       requireTargetExists ? false,
       targetKind ? null,
     }:
@@ -135,6 +136,7 @@ let
       inherit
         from
         to
+        file
         requireTargetExists
         targetKind
         ;
@@ -144,6 +146,7 @@ let
     {
       from,
       to,
+      file ? null,
       requireTargetExists ? false,
       targetKind ? null,
     }:
@@ -151,6 +154,7 @@ let
       inherit
         from
         to
+        file
         requireTargetExists
         targetKind
         ;
@@ -160,6 +164,7 @@ let
     {
       from,
       to,
+      file ? null,
       requireTargetExists ? false,
       targetKind ? null,
     }:
@@ -167,6 +172,7 @@ let
       inherit
         from
         to
+        file
         requireTargetExists
         targetKind
         ;

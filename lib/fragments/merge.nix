@@ -17,6 +17,11 @@ let
     [ "patching" "ignore" "paths" ]
     [ "patching" "ignore" "suffixes" ]
     [ "patching" "ignore" "extensions" ]
+    [ "patching" "ignore" "globs" ]
+
+    [ "patching" "textPatches" ]
+    [ "patching" "binaryPatches" ]
+    [ "patching" "elfPatches" ]
   ];
 
   scalarKeys = [

@@ -77,12 +77,16 @@ let
   normalizePatchList =
     patches:
     map
-      (patch: {
-        from = patch.from;
-        to = patch.to;
-        requireTargetExists = patch.requireTargetExists or false;
-        targetKind = patch.targetKind or null;
-      })
+      (patch:
+        {
+          from = patch.from;
+          to = patch.to;
+          requireTargetExists = patch.requireTargetExists or false;
+          targetKind = patch.targetKind or null;
+        }
+        // lib.optionalAttrs (patch ? file && patch.file != null) {
+          file = patch.file;
+        })
       patches;
 
   directoryKeys =
