@@ -72,7 +72,7 @@ let
 
   normalizeSimpleTextRewrites =
     rewrites:
-    rewrites or { };
+    if rewrites == null then { } else rewrites;
 
   normalizePatchList =
     patches:

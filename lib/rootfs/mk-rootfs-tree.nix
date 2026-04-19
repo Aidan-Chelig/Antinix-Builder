@@ -121,7 +121,10 @@ runCommand "${systemName}-rootfs-tree"
     mkdir -p "$out"
     cp -a "${baseTree}/." "$out/"
 
-    "${rootfsPatcher}/bin/rootfs-patcher" \
+    chmod u+w "$out"
+    chmod -R u+w "$out" 2>/dev/null || true
+
+    "${rootfsPatcher}/bin/rootfs-patcher" process \
       --root "$out" \
       --config "${patcherConfigJson}"
 

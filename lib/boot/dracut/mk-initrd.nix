@@ -260,6 +260,7 @@ runCommand name
     ln -sf ${util-linux}/bin/mount   "$PWD/bin/mount"
     ln -sf ${util-linux}/bin/umount  "$PWD/bin/umount"
     ln -sf ${util-linux}/bin/findmnt "$PWD/bin/findmnt"
+    ln -sf ${util-linux}/bin/flock   "$PWD/bin/flock"
     ln -sf ${util-linux}/bin/switch_root "$PWD/bin/switch_root"
 
     ln -sf ${kmod}/bin/kmod          "$PWD/bin/kmod"

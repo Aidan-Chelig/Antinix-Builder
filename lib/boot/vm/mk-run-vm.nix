@@ -100,8 +100,6 @@ let
       "-device" "qemu-xhci"
       "-device" "usb-kbd"
       "-device" "usb-mouse"
-      "-drive" "file=$IMAGE,format=raw,if=none,id=drv0"
-      "-device" "virtio-blk-pci,drive=drv0,id=virtio0"
     ]
     ++ lib.optionals net [
       "-nic" "user,model=virtio-net-pci"
@@ -112,8 +110,6 @@ let
       "-M" "virt"
       "-cpu" "cortex-a72"
       "-device" "virtio-rng-pci"
-      "-drive" "file=$IMAGE,format=raw,if=none,id=vdisk"
-      "-device" "virtio-blk-device,drive=vdisk"
       "-serial" "stdio"
       "-monitor" "none"
     ]
@@ -155,6 +151,18 @@ writeShellScriptBin name ''
   args=(
 ${argsBlock}
   )
+
+  if [ "${guestSystem}" = "x86_64-linux" ]; then
+    args+=(
+      "-drive" "file=$IMAGE,format=raw,if=none,id=drv0"
+      "-device" "virtio-blk-pci,drive=drv0,id=virtio0"
+    )
+  elif [ "${guestSystem}" = "aarch64-linux" ]; then
+    args+=(
+      "-drive" "file=$IMAGE,format=raw,if=none,id=vdisk"
+      "-device" "virtio-blk-device,drive=vdisk"
+    )
+  fi
 
   printf 'QEMU CMD: %q ' "${qemuBinary}" "''${args[@]}"
   printf '\n'

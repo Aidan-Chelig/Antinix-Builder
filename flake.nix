@@ -71,7 +71,7 @@
 
             kernelVersion = kernelPkg.modDirVersion or kernelPkg.version;
 
-            moduleTree = kernelPkg.dev or kernelPkg;
+            moduleTree = kernelPkg.dev;
 
             kernelImage =
               if guestCfg.guestSystem == "x86_64-linux" then
@@ -79,19 +79,14 @@
               else
                 "${kernelPkg}/${guestCfg.kernelPath}";
 
-            initrd =
-              antinix.mkInitrd {
-                name = "minimal-busybox-none-initrd.img";
-                inherit
-                  kernelVersion
-                  moduleTree
-                  ;
-                extraDrivers = lib.optionals (guestCfg.guestSystem == "x86_64-linux") [
-                  "virtio_net"
-                ] ++ lib.optionals (guestCfg.guestSystem == "aarch64-linux") [
-                  "virtio_net"
-                ];
-              };
+initrd =
+  antinix.mkInitrd {
+    name = "minimal-busybox-none-initrd.img";
+    inherit
+      kernelVersion
+      moduleTree
+      ;
+  };
 
             runVm =
               antinix.mkRunVm {
@@ -103,7 +98,11 @@
                   ;
                 hostSystem = pkgs.system;
                 guestSystem = guestCfg.guestSystem;
-                kernelParams = [ ];
+kernelParams = [
+  "rd.debug"
+  "rd.shell"
+  "rd.break=initqueue"
+];
                 extraQemuArgs = [ ];
               };
           in

@@ -58,16 +58,14 @@ let
     pkgs.callPackage ../pkgs/dracut-shell-parser.nix { };
 
   mkOverlayReport =
-    args:
-    pkgs.callPackage ./boot/dracut/overlay-report.nix ({
+    pkgs.callPackage ./boot/dracut/overlay-report.nix {
       inherit overlaySpec dracutShellParser;
-    } // args);
+    };
 
   mkInitrd =
-    args:
-    pkgs.callPackage ./boot/dracut/mk-initrd.nix ({
+    pkgs.callPackage ./boot/dracut/mk-initrd.nix {
       inherit overlaySpec;
-    } // args);
+    };
 
   mkRunVm =
     pkgs.callPackage ./boot/vm/mk-run-vm.nix {

@@ -19,6 +19,11 @@ let
       dst = "/bin/bash";
     };
 
+    flock = {
+      src = "${util-linux}/bin/flock";
+      dst = "/bin/flock";
+    };
+
     sh = {
       src = "${bash}/bin/bash";
       dst = "/bin/sh";
@@ -276,6 +281,7 @@ let
       "blkid"
       "findmnt"
       "switch_root"
+      "flock"
     ];
 
     power = [
