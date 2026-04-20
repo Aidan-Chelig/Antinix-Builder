@@ -4,6 +4,7 @@ let
   src = ../.;
 
   docSources = [
+    "flake.nix"
     "lib/default.nix"
     "lib/system/mk-system.nix"
     "lib/boot/dracut/mk-initrd.nix"

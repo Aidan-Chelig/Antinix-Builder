@@ -68,7 +68,19 @@ libFor =
   };
     in
     {
+      ##@ name: libFor
+      ##@ path: flake.libFor
+      ##@ kind: function
+      ##@ summary: Build the Antinix library for a specific host system, including the correct guest package set and Linux build toolchain.
+      ##@ param: system string Host platform to target, such as "x86_64-linux" or "aarch64-darwin".
+      ##@ returns: Antinix library attrset for the requested host system.
       libFor = libFor;
+
+      ##@ name: lib
+      ##@ path: flake.lib
+      ##@ kind: module
+      ##@ summary: Default Antinix library instance for x86_64-linux hosts.
+      ##@ returns: Antinix library attrset equivalent to libFor "x86_64-linux".
       lib = libFor "x86_64-linux";
 
       packages = forAllSystems (

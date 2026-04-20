@@ -18,6 +18,7 @@
 ##@ param: kernelParams list Extra kernel command line parameters.
 ##@ param: extraDevices list Extra QEMU -device arguments.
 ##@ param: extraQemuArgs list Raw extra QEMU arguments appended at the end.
+##@ param: display string? Explicit QEMU display backend override.
 ##@ returns: derivation containing the VM launcher script.
 ##@ example: antinixLib.mkRunVm { name = "run-demo"; rootfsImage = demoSystem.image; kernelImage = "${kernel}/bzImage"; initrd = demoInitrd; hostSystem = system; guestSystem = system; graphics = false; }
 

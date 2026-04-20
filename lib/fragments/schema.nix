@@ -72,6 +72,7 @@ let
   };
 
   ##@ name: mkFile
+  ##@ path: lib.schema.mkFile
   ##@ kind: helper
   ##@ summary: Define a file in the rootfs.
   ##@ param: source path? Source file to copy.
@@ -101,6 +102,7 @@ let
     };
 
   ##@ name: mkDirectory
+  ##@ path: lib.schema.mkDirectory
   ##@ kind: helper
   ##@ summary: Define a directory in the rootfs.
   ##@ param: mode string? Directory mode.
@@ -119,6 +121,7 @@ let
     };
 
   ##@ name: mkImport
+  ##@ path: lib.schema.mkImport
   ##@ kind: helper
   ##@ summary: Import an existing filesystem tree into the rootfs.
   ##@ param: source path Source directory to copy.
@@ -137,15 +140,19 @@ let
     };
 
   ##@ name: mkUser
+  ##@ path: lib.schema.mkUser
   ##@ kind: helper
   ##@ summary: Define a system user.
+  ##@ param: isNormalUser bool Whether user is a normal account.
   ##@ param: uid int? User ID.
   ##@ param: group string? Primary group.
   ##@ param: extraGroups list Supplementary groups.
-  ##@ param: home string Home directory.
+  ##@ param: home string? Home directory.
   ##@ param: shell string Login shell.
-  ##@ param: hashedPassword string Pre-hashed password.
-  ##@ param: isNormalUser bool Whether user is a normal account.
+  ##@ param: password string? Plain-text password for generated account data.
+  ##@ param: hashedPassword string? Pre-hashed password.
+  ##@ param: createHome bool Whether the home directory should be created.
+  ##@ param: description string Account description or gecos field.
   ##@ returns: attrset describing a user.
   mkUser =
     {
@@ -177,6 +184,7 @@ let
     };
 
   ##@ name: mkGroup
+  ##@ path: lib.schema.mkGroup
   ##@ kind: helper
   ##@ summary: Define a system group.
   ##@ param: gid int? Group ID.
@@ -248,6 +256,11 @@ let
 
 in
 {
+  ##@ name: defaults
+  ##@ path: lib.schema.defaults
+  ##@ kind: module
+  ##@ summary: Default fragment shape used as the baseline for consumer-authored system specifications.
+  ##@ returns: Attrset of default values for packages, files, users, runtime, patching, validation, and metadata.
   inherit
     defaults
     mkFile
@@ -260,4 +273,44 @@ in
     mkElfPatch
     isFragment
     ;
+
+  ##@ name: mkTextPatch
+  ##@ path: lib.schema.mkTextPatch
+  ##@ kind: helper
+  ##@ summary: Define a text rewrite rule for the rootfs patcher.
+  ##@ param: from string Source text to replace.
+  ##@ param: to string Replacement text.
+  ##@ param: file string? Optional file path restriction.
+  ##@ param: requireTargetExists bool? Require the rewritten target to exist in the rootfs.
+  ##@ param: targetKind string? Optional target kind restriction.
+  ##@ returns: attrset describing a text rewrite rule.
+
+  ##@ name: mkBinaryPatch
+  ##@ path: lib.schema.mkBinaryPatch
+  ##@ kind: helper
+  ##@ summary: Define a binary rewrite rule for the rootfs patcher.
+  ##@ param: from string Source bytes or string to replace.
+  ##@ param: to string Replacement bytes or string.
+  ##@ param: file string? Optional file path restriction.
+  ##@ param: requireTargetExists bool? Require the rewritten target to exist in the rootfs.
+  ##@ param: targetKind string? Optional target kind restriction.
+  ##@ returns: attrset describing a binary rewrite rule.
+
+  ##@ name: mkElfPatch
+  ##@ path: lib.schema.mkElfPatch
+  ##@ kind: helper
+  ##@ summary: Define an ELF patch rule for the rootfs patcher.
+  ##@ param: from string Original value or interpreter marker to replace.
+  ##@ param: to string Replacement value.
+  ##@ param: file string? Optional file path restriction.
+  ##@ param: requireTargetExists bool? Require the rewritten target to exist in the rootfs.
+  ##@ param: targetKind string? Optional target kind restriction.
+  ##@ returns: attrset describing an ELF patch rule.
+
+  ##@ name: isFragment
+  ##@ path: lib.schema.isFragment
+  ##@ kind: helper
+  ##@ summary: Predicate that reports whether a value is fragment-shaped.
+  ##@ param: value any Value to test.
+  ##@ returns: Boolean indicating whether the value is an attrset fragment.
 }

@@ -18,6 +18,7 @@
 }:
 
 ##@ name: mkInitrd
+##@ path: lib.mkInitrd
 ##@ kind: function
 ##@ summary: Build a dracut initrd for a kernel or nixosSystem.
 ##@ param: name string? Initrd output filename.
@@ -25,7 +26,22 @@
 ##@ param: kernel derivation? Optional explicit kernel override.
 ##@ param: moduleTree derivation? Optional explicit modules tree override.
 ##@ param: kernelVersion string? Optional explicit kernel version override.
+##@ param: hostonly bool? Whether dracut should build a host-only initrd.
+##@ param: useFstab bool? Whether dracut should consult fstab when generating the initrd.
+##@ param: compress string? Compression algorithm passed to dracut.
+##@ param: extraModules list Additional dracut modules to include.
+##@ param: extraOmitModules list Additional dracut modules to omit.
 ##@ param: extraDrivers list Additional kernel drivers to include.
+##@ param: extraFilesystems list Additional filesystem drivers to include.
+##@ param: modules list? Complete replacement for the dracut module list.
+##@ param: omitModules list? Complete replacement for the omitted dracut module list.
+##@ param: drivers list? Complete replacement for the kernel driver list.
+##@ param: filesystems list? Complete replacement for the filesystem driver list.
+##@ param: extraOverlayCommands string? Extra shell commands appended to the initrd overlay build script.
+##@ param: extraOverlayFiles list Additional files copied into the initrd overlay.
+##@ param: extraOverlayCommandsList list Additional overlay commands supplied as a list of strings.
+##@ param: extraBinSymlinks attrset Extra symlinks created in the initrd tool PATH.
+##@ param: extraDracutConfig string? Raw dracut configuration appended to the generated config file.
 ##@ returns: derivation producing an initrd image.
 ##@ example: antinixLib.mkInitrd { name = "initrd.img"; nixosSystem = kernelSystem; extraDrivers = [ "virtio_blk" "ext4" ]; }
 

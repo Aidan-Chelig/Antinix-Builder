@@ -11,17 +11,7 @@ let
     inherit schema;
   };
 
-##@ name: initSystems
-##@ kind: registry
-##@ summary: Available init system fragments keyed by name.
-##@ returns: attrset mapping init system names to fragment builders.
-
 initSystems = guestPkgs.callPackage ./fragments/init-systems/default.nix { };
-
-##@ name: packageManagers
-##@ kind: registry
-##@ summary: Available package manager fragments keyed by name.
-##@ returns: attrset mapping package manager names to fragment builders.
 
 packageManagers = guestPkgs.callPackage ./fragments/package-managers/default.nix { };
 
@@ -102,25 +92,101 @@ in
     mkRunVm
     ;
 
+  ##@ name: merge
+  ##@ path: lib.merge
+  ##@ kind: module
+  ##@ summary: Fragment merge utilities used to combine init, package manager, and user-defined system fragments.
+  ##@ returns: Attrset of merge helpers for advanced composition workflows.
+
+  ##@ name: normalize
+  ##@ path: lib.normalize
+  ##@ kind: function
+  ##@ summary: Normalize a merged fragment into the canonical system specification consumed by artifact builders.
+  ##@ param: fragment attrset Fragment or merged fragment to normalize.
+  ##@ returns: Canonical normalized system specification.
+
+  ##@ name: accounts
+  ##@ path: lib.accounts
+  ##@ kind: module
+  ##@ summary: Helpers for generating passwd, group, shadow, and home-directory metadata from declared users and groups.
+  ##@ returns: Attrset exposing account generation helpers.
+
+  ##@ name: overlay
+  ##@ path: lib.overlay
+  ##@ kind: module
+  ##@ summary: Filesystem overlay builder used to assemble files, directories, imports, and symlinks into a rootfs tree.
+  ##@ returns: Attrset exposing overlay construction helpers.
+
+  ##@ name: patcherConfig
+  ##@ path: lib.patcherConfig
+  ##@ kind: module
+  ##@ summary: Builder for rootfs patcher configuration used to rewrite store paths and normalize runtime layout.
+  ##@ returns: Attrset exposing patcher configuration helpers.
+
+  ##@ name: overlaySpec
+  ##@ path: lib.overlaySpec
+  ##@ kind: module
+  ##@ summary: Dracut overlay specification describing files and commands injected into generated initrds.
+  ##@ returns: Attrset containing overlay file and command metadata.
+
+  ##@ name: dracutShellParser
+  ##@ path: lib.dracutShellParser
+  ##@ kind: module
+  ##@ summary: Shell parsing utility used to analyze dracut scripts for overlay reporting.
+  ##@ returns: Parser package and helpers for dracut shell analysis.
+
+  ##@ name: mkOverlayReport
+  ##@ path: lib.mkOverlayReport
+  ##@ kind: function
+  ##@ summary: Generate a report describing the effective dracut overlay and discovered runtime dependencies.
+  ##@ param: script path Shell script or dracut snippet to analyze.
+  ##@ returns: Derivation containing the generated overlay analysis report.
+
+  ##@ name: mkRootfsTree
+  ##@ path: lib.mkRootfsTree
+  ##@ kind: function
+  ##@ summary: Build a processed rootfs tree from a normalized system specification.
+  ##@ param: spec attrset Normalized or consumer-authored system specification.
+  ##@ returns: Derivation containing the assembled rootfs tree.
+
+  ##@ name: mkRootfsTarball
+  ##@ path: lib.mkRootfsTarball
+  ##@ kind: function
+  ##@ summary: Package a rootfs tree into a tarball with ownership and SUID metadata applied.
+  ##@ param: rootfs path Rootfs tree to archive.
+  ##@ param: name string? Output tarball name prefix.
+  ##@ param: users attrset? User definitions used to restore ownership in the archive.
+  ##@ param: groups attrset? Group definitions used to resolve ownership in the archive.
+  ##@ returns: Derivation producing a compressed rootfs tarball.
+
+  ##@ name: mkRootfsImage
+  ##@ path: lib.mkRootfsImage
+  ##@ kind: function
+  ##@ summary: Build a bootable disk image from a rootfs tree.
+  ##@ param: rootfs path Rootfs tree to install into the image.
+  ##@ param: name string? Output image name.
+  ##@ returns: Derivation producing a disk image file.
+
   ##@ name: schema
+  ##@ path: lib.schema
   ##@ kind: module
   ##@ summary: Consumer-facing schema helpers.
   ##@ returns: attrset exposing mkFile, mkDirectory, mkImport, mkUser, mkGroup.
   schema = schema;
 
   ##@ name: initSystems
+  ##@ path: lib.initSystems
   ##@ kind: registry
   ##@ summary: Available init systems.
+  ##@ returns: Attrset mapping init-system names to fragment builders.
   initSystems = initSystems;
 
   ##@ name: packageManagers
+  ##@ path: lib.packageManagers
   ##@ kind: registry
   ##@ summary: Available package managers.
+  ##@ returns: Attrset mapping package-manager names to fragment builders.
   packageManagers = packageManagers;
-
-  ##@ name: mkSystem
-  ##@ kind: function
-  ##@ summary: Entry point for building Antinix systems.
   mkSystem = mkSystem ;
 
 
