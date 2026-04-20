@@ -19,8 +19,10 @@
 
 {
   name ? "dracut-initramfs.img",
-  kernelVersion,
-  moduleTree,
+nixosSystem ? null,
+kernel ? null,
+moduleTree ? null,
+kernelVersion ? null,
 
   # High-level dracut controls
   hostonly ? false,
@@ -52,6 +54,24 @@
 }:
 
 let
+
+  effectiveKernel =
+    if kernel != null then kernel
+    else if nixosSystem != null then nixosSystem.config.system.build.kernel
+    else null;
+
+  effectiveModuleTree =
+    if moduleTree != null then moduleTree
+    else if nixosSystem != null then nixosSystem.config.system.modulesTree
+    else if effectiveKernel != null && effectiveKernel ? modules then effectiveKernel.modules
+    else if effectiveKernel != null && effectiveKernel ? dev then effectiveKernel.dev
+    else effectiveKernel;
+
+  effectiveKernelVersion =
+    if kernelVersion != null then kernelVersion
+    else if effectiveKernel != null then (effectiveKernel.modDirVersion or effectiveKernel.version)
+    else throw "mkInitrd: one of `nixosSystem` or `kernel` must be provided (or pass `kernelVersion` and `moduleTree` explicitly)";
+
   defaultModules = [
     "base"
     "kernel-modules"
@@ -366,8 +386,8 @@ EOF
       --force \
       --verbose \
       ${lib.optionalString (!hostonly) "--no-hostonly \\"}
-      --kver "${kernelVersion}" \
-      --kmoddir "$MODULES_DIR" \
+      --kver "${effectiveKernelVersion}" \
+      --kmoddir "${effectiveModuleTree}/lib/modules/${effectiveKernelVersion}" \
       --include "$PWD/overlay" / \
       --conf /dev/null \
       --confdir "$PWD/etc/dracut.conf.d" \
