@@ -7,7 +7,10 @@
 {
   name = "simple-init";
 
-  packages = [ ];
+  packages = [
+    pkgs.bash
+    pkgs.coreutils
+  ];
 
   files = {
     "/init" = {

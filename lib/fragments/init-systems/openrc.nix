@@ -17,6 +17,8 @@ let
 
   basePackages = [
     openrc
+    pkgs.bash
+    pkgs.coreutils
     (pkgs.lib.getBin pkgs.util-linux)
     pkgs.procps
     pkgs.kbd
@@ -93,6 +95,11 @@ in
         term_type="vt100"
       '';
       mode = "0644";
+    };
+
+    "/usr/bin/sysctl" = {
+      source = "${pkgs.procps}/bin/sysctl";
+      mode = "0755";
     };
 
     "/etc/conf.d/keymaps" = {
@@ -249,13 +256,14 @@ in
     "/sbin/openrc" = "/usr/bin/openrc";
     "/sbin/openrc-run" = "/usr/bin/openrc-run";
     "/sbin/agetty" = "/usr/bin/agetty";
+    "/bin/sysctl" = "/usr/bin/sysctl";
     "/bin/login" = "/usr/bin/login";
     "/etc/runlevels/default/local" = "/etc/init.d/local";
 
     "/etc/init.d/agetty.${console}" = "/etc/init.d/agetty";
     "/etc/runlevels/default/agetty.${console}" = "/etc/init.d/agetty.${console}";
   }
-  // lib.optionalAttrs (console == "ttyS0") {
+  // lib.optionalAttrs (console != "tty1") {
     "/etc/init.d/agetty.tty1" = "/etc/init.d/agetty";
     "/etc/runlevels/default/agetty.tty1" = "/etc/init.d/agetty.tty1";
   };
@@ -301,12 +309,6 @@ in
 
   postBuild = [
     ''
-      cp -Lf --remove-destination "$(readlink -f ${pkgs.procps}/bin/sysctl)" "$out/usr/bin/sysctl"
-      chmod u+w "$out/usr/bin/sysctl" || true
-
-      rm -f "$out/bin/sysctl"
-      ln -s ../usr/bin/sysctl "$out/bin/sysctl"
-
       mkdir -p \
         "$out/debug" \
         "$out/etc/runlevels/boot" \

@@ -9,6 +9,8 @@
 
 let
   basePackages = [
+    pkgs.bash
+    pkgs.coreutils
     pkgs.dinit
     pkgs.util-linux
     pkgs.inetutils

@@ -9,6 +9,8 @@
 
 let
   basePackages = [
+    pkgs.bash
+    pkgs.coreutils
     pkgs.runit
     pkgs.util-linux
     (pkgs.lib.getBin pkgs.shadow)
