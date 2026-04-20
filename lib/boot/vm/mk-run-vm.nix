@@ -39,6 +39,8 @@
   kernelParams ? [ ],
   extraDevices ? [ ],
   extraQemuArgs ? [ ],
+
+  display ? null,
 }:
 
 let
@@ -73,8 +75,8 @@ let
   baseKernelParams =
     if guestSystem == "x86_64-linux" then
       [
-        "console=tty0"
         "console=ttyS0"
+        "console=tty0"
         "root=/dev/vda"
         "rootfstype=ext4"
         "rw"
@@ -83,11 +85,15 @@ let
         "rd.driver.pre=virtio_blk"
         "rd.driver.pre=ext4"
         "rd.driver.pre=virtio_net"
+        "rd.driver.pre=virtio_gpu"
+        "rd.driver.pre=drm"
+        "rd.driver.pre=drm_kms_helper"
         "init=/init"
       ]
     else if guestSystem == "aarch64-linux" then
       [
         "console=ttyAMA0"
+        "console=tty0"
         "root=/dev/vda"
         "rootfstype=ext4"
         "rw"
@@ -96,6 +102,9 @@ let
         "rd.driver.pre=virtio_blk"
         "rd.driver.pre=ext4"
         "rd.driver.pre=virtio_net"
+        "rd.driver.pre=virtio_gpu"
+        "rd.driver.pre=drm"
+        "rd.driver.pre=drm_kms_helper"
         "init=/init"
       ]
     else
@@ -104,27 +113,37 @@ let
   effectiveKernelParams = baseKernelParams ++ kernelParams;
   kernelAppend = lib.concatStringsSep " " effectiveKernelParams;
 
-graphicsArgs =
-  if graphics then
-    if guestSystem == "x86_64-linux" then
-      [
-        "-display" "gtk"
-        "-device" "virtio-gpu-pci"
-      ]
-    else if guestSystem == "aarch64-linux" then
-      [
-        "-display" "gtk"
-        "-device" "virtio-gpu-pci"
-        "-device" "qemu-xhci"
-        "-device" "usb-kbd"
-        "-device" "usb-mouse"
-      ]
+  displayBackend =
+    if display != null then
+      display
+    else if !graphics then
+      "none"
+    else if hostSystem == "aarch64-darwin" || hostSystem == "x86_64-darwin" then
+      "cocoa"
     else
-      [ ]
-  else
-    [
-      "-display" "none"
-    ];
+      "gtk";
+
+graphicsArgs =
+    if graphics then
+      if guestSystem == "x86_64-linux" then
+        [
+          "-display" displayBackend
+          "-device" "virtio-gpu-pci"
+        ]
+      else if guestSystem == "aarch64-linux" then
+        [
+          "-display" displayBackend
+          "-device" "virtio-gpu-pci"
+          "-device" "qemu-xhci"
+          "-device" "usb-kbd"
+          "-device" "usb-mouse"
+        ]
+      else
+        [ ]
+    else
+      [
+        "-display" "none"
+      ];
 
   serialArgs =
     if serialConsole then

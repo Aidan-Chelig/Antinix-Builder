@@ -71,6 +71,9 @@ in
     # Load common VM input drivers so graphical console input works even
     # without udev-based module autoload.
     for mod in \
+      virtio_gpu \
+      drm \
+      drm_kms_helper \
       i8042 \
       atkbd \
       psmouse \

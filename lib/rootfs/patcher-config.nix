@@ -1,4 +1,4 @@
-{ lib }:
+{ lib, guestSystem ? null }:
 
 let
   defaultStrictScanRoots = [
@@ -66,9 +66,9 @@ let
     synthesize_glibc_compat_symlinks = true;
     normalize_absolute_needed = true;
     rewrite_embedded_store_paths = true;
-    minimize_rpath_from_graph = true;
+    minimize_rpath_from_graph = false;
     default_interpreter = null;
-    default_rpath = null;
+    default_rpath = "/lib:/usr/lib:/lib64:/usr/lib64";
     patchelf_bin = null;
   };
 
@@ -146,19 +146,29 @@ let
 
   directoryKeys = dirs: builtins.attrNames dirs;
 
+  interpreterForGuestSystem =
+    system:
+    if system == null then
+      null
+    else if system == "x86_64-linux" then
+      "ld-linux-x86-64.so.2"
+    else if system == "aarch64-linux" then
+      "ld-linux-aarch64.so.1"
+    else if system == "riscv64-linux" then
+      "ld-linux-riscv64-lp64d.so.1"
+    else
+      null;
+
   chooseExpectedInterpreter =
     runtimeLayout:
     let
       installDir = runtimeLayout.install_detected_interpreter_to or null;
+      loaderName = interpreterForGuestSystem guestSystem;
     in
-    if installDir == null then
+    if installDir == null || loaderName == null then
       null
-    else if installDir == "/lib64" then
-      "/lib64/ld-linux-x86-64.so.2"
-    else if installDir == "/lib" then
-      "/lib/ld-linux.so.2"
     else
-      null;
+      "${installDir}/${loaderName}";
 
 in
 {

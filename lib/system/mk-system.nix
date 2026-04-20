@@ -91,6 +91,7 @@ in
 args@{
   name ? null,
   hostname ? "localhost",
+  console ? "ttyS0",
   init ? "busybox",
   packageManager ? "none",
 
@@ -187,7 +188,7 @@ let
 
   fragmentContext = {
     hostname = hostname;
-    console = "ttyS0";
+    console = console;
   };
 
   realizeFragment =

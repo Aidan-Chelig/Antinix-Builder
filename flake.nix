@@ -13,6 +13,7 @@
       supportedSystems = [
         "x86_64-linux"
         "aarch64-linux"
+        "aarch64-darwin"
       ];
 
       forAllSystems =
@@ -24,13 +25,6 @@
           in
           f pkgs
         );
-
-      libFor =
-        system:
-        let
-          pkgs = import nixpkgs { inherit system; };
-        in
-        pkgs.callPackage ./lib/default.nix { };
 
       guestConfigFor =
         hostSystem:
@@ -46,8 +40,32 @@
             kernelPath = "Image";
             console = "ttyAMA0";
           }
+        else if hostSystem == "aarch64-darwin" then
+          {
+            guestSystem = "aarch64-linux";
+            kernelPath = "Image";
+            console = "ttyAMA0";
+          }
         else
           throw "Unsupported host system: ${hostSystem}";
+
+libFor =
+  system:
+  let
+    hostPkgs = import nixpkgs { inherit system; };
+    guestCfg = guestConfigFor system;
+
+    guestPkgs = import nixpkgs {
+      system = guestCfg.guestSystem;
+    };
+
+    linuxBuildPkgs = import nixpkgs {
+      system = guestCfg.guestSystem;
+    };
+  in
+  hostPkgs.callPackage ./lib/default.nix {
+    inherit guestPkgs linuxBuildPkgs;
+  };
     in
     {
       libFor = libFor;
@@ -58,7 +76,21 @@
         let
           apiReference = pkgs.callPackage ./docs/api-reference.nix { };
 
-          antinix = pkgs.callPackage ./lib/default.nix { };
+          hostPkgs = pkgs;
+          hostSystem = hostPkgs.stdenv.hostPlatform.system;
+          guestCfg = guestConfigFor hostSystem;
+
+          guestPkgs = import nixpkgs {
+            system = guestCfg.guestSystem;
+          };
+
+          linuxBuildPkgs = import nixpkgs {
+            system = guestCfg.guestSystem;
+          };
+
+          antinix = hostPkgs.callPackage ./lib/default.nix {
+            inherit guestPkgs linuxBuildPkgs;
+          };
 
           initNames = builtins.filter (n: !(lib.hasPrefix "override" n)) (
             builtins.attrNames antinix.initSystems
@@ -68,10 +100,8 @@
             builtins.attrNames antinix.packageManagers
           );
 
-          guestCfg = guestConfigFor pkgs.system;
-
           kernelSystem = nixpkgs.lib.nixosSystem {
-            system = pkgs.system;
+            system = guestCfg.guestSystem;
             modules = [
               (
                 { modulesPath, ... }:
@@ -128,6 +158,7 @@
             antinix.mkSystem {
               name = "${packageManager}-${init}";
               hostname = "antinix";
+              console = guestCfg.console;
               inherit init packageManager;
 
               buildTarball = true;
@@ -195,7 +226,7 @@
                 name = "run-vm-${variantName}";
                 rootfsImage = variant.image;
                 inherit kernelImage initrd;
-                hostSystem = pkgs.system;
+                inherit hostSystem;
                 guestSystem = guestCfg.guestSystem;
                 kernelParams = [ ];
                 extraQemuArgs = [ ];
@@ -244,7 +275,21 @@
       apps = forAllSystems (
         pkgs:
         let
-          antinix = pkgs.callPackage ./lib/default.nix { };
+          hostPkgs = pkgs;
+          hostSystem = hostPkgs.stdenv.hostPlatform.system;
+          guestCfg = guestConfigFor hostSystem;
+
+          guestPkgs = import nixpkgs {
+            system = guestCfg.guestSystem;
+          };
+
+          linuxBuildPkgs = import nixpkgs {
+            system = guestCfg.guestSystem;
+          };
+
+          antinix = hostPkgs.callPackage ./lib/default.nix {
+            inherit guestPkgs linuxBuildPkgs;
+          };
 
           initNames = builtins.filter (n: !(lib.hasPrefix "override" n)) (
             builtins.attrNames antinix.initSystems
@@ -258,10 +303,10 @@
             init: packageManager:
             let
               variantName = "${packageManager}-${init}";
-              vm = self.packages.${pkgs.system}."vm-${variantName}";
+              vm = self.packages.${hostSystem}."vm-${variantName}";
             in
             {
-              name = "run-vm-${variantName}";
+              name = "vm-${variantName}";
               value = {
                 type = "app";
                 program = "${vm}/bin/run-vm-${variantName}";

@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, guestPkgs ? pkgs, linuxBuildPkgs ? guestPkgs }:
 
 let
   schema = pkgs.callPackage ./fragments/schema.nix { };
@@ -16,27 +16,29 @@ let
 ##@ summary: Available init system fragments keyed by name.
 ##@ returns: attrset mapping init system names to fragment builders.
 
-  initSystems = pkgs.callPackage ./fragments/init-systems/default.nix { };
+initSystems = guestPkgs.callPackage ./fragments/init-systems/default.nix { };
 
 ##@ name: packageManagers
 ##@ kind: registry
 ##@ summary: Available package manager fragments keyed by name.
 ##@ returns: attrset mapping package manager names to fragment builders.
 
-  packageManagers = pkgs.callPackage ./fragments/package-managers/default.nix { };
+packageManagers = guestPkgs.callPackage ./fragments/package-managers/default.nix { };
 
   accounts = pkgs.callPackage ./rootfs/accounts.nix { };
 
   overlay = pkgs.callPackage ./rootfs/overlay.nix { };
 
-  patcherConfig = pkgs.callPackage ./rootfs/patcher-config.nix { };
+  patcherConfig = pkgs.callPackage ./rootfs/patcher-config.nix {
+    guestSystem = linuxBuildPkgs.stdenv.hostPlatform.system;
+  };
 
-  rootfsPatcher = pkgs.callPackage ../pkgs/rootfs-patcher.nix { };
+rootfsPatcher = linuxBuildPkgs.callPackage ../pkgs/rootfs-patcher.nix { };
 
-  mkRootfsTree = pkgs.callPackage ./rootfs/mk-rootfs-tree.nix {
-    buildEnv = pkgs.buildEnv;
-    runCommand = pkgs.runCommand;
-    writeText = pkgs.writeText;
+  mkRootfsTree = linuxBuildPkgs.callPackage ./rootfs/mk-rootfs-tree.nix {
+    buildEnv = linuxBuildPkgs.buildEnv;
+    runCommand = linuxBuildPkgs.runCommand;
+    writeText = linuxBuildPkgs.writeText;
     inherit
       accounts
       overlay
@@ -45,19 +47,19 @@ let
       ;
   };
 
-  mkRootfsTarball = pkgs.callPackage ./artifacts/rootfs-tarball.nix { };
+  mkRootfsTarball = linuxBuildPkgs.callPackage ./artifacts/rootfs-tarball.nix { };
 
-  mkRootfsImage = pkgs.callPackage ./artifacts/rootfs-image.nix { };
+  mkRootfsImage = linuxBuildPkgs.callPackage ./artifacts/rootfs-image.nix { };
 
-  overlaySpec = pkgs.callPackage ./boot/dracut/overlay-spec.nix { };
+  overlaySpec = linuxBuildPkgs.callPackage ./boot/dracut/overlay-spec.nix { };
 
-  dracutShellParser = pkgs.callPackage ../pkgs/dracut-shell-parser.nix { };
+  dracutShellParser = linuxBuildPkgs.callPackage ../pkgs/dracut-shell-parser.nix { };
 
-  mkOverlayReport = pkgs.callPackage ./boot/dracut/overlay-report.nix {
+  mkOverlayReport = linuxBuildPkgs.callPackage ./boot/dracut/overlay-report.nix {
     inherit overlaySpec dracutShellParser;
   };
 
-  mkInitrd = pkgs.callPackage ./boot/dracut/mk-initrd.nix {
+  mkInitrd = linuxBuildPkgs.callPackage ./boot/dracut/mk-initrd.nix {
     inherit overlaySpec;
   };
 
