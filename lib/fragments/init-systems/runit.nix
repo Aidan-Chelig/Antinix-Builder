@@ -145,6 +145,17 @@ in
       mode = "0755";
     };
 
+    "/etc/sv/getty.tty1/run" = {
+      text = ''
+        #!/bin/sh
+        export PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
+        exec </dev/tty1 >/dev/tty1 2>&1
+        exec /usr/bin/setsid -c /usr/bin/agetty tty1 115200 linux -l /usr/bin/login
+      '';
+      mode = "0755";
+    };
+
     "/init" = {
       text = ''
         #!/bin/sh
@@ -164,10 +175,14 @@ in
     };
   };
 
-  symlinks = {
-    "/sbin/init" = "/usr/bin/runit";
-    "/etc/service/getty" = "/etc/sv/getty";
-  };
+  symlinks =
+    {
+      "/sbin/init" = "/usr/bin/runit";
+      "/etc/service/getty" = "/etc/sv/getty";
+    }
+    // lib.optionalAttrs (console != "tty1") {
+      "/etc/service/getty.tty1" = "/etc/sv/getty.tty1";
+    };
 
   runtime = {
     tmpfsDirs = [
