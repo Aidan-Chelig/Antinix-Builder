@@ -14,7 +14,6 @@ let
   availableInitSystems = builtins.attrNames initSystems;
   availablePackageManagers = builtins.attrNames packageManagers;
 
-
   getInitFragment =
     init:
     initSystems.${init} or (throw ''
@@ -28,9 +27,6 @@ let
       Unknown package manager: ${packageManager}
       Available package managers: ${lib.concatStringsSep ", " availablePackageManagers}
     '');
-
-
-
 
   baseFragmentFromArgs =
     {
@@ -75,6 +71,23 @@ let
     };
 
 in
+
+##@ name: mkSystem
+##@ kind: function
+##@ summary: Build a system spec and rootfs artifacts.
+##@ param: name string? System name used for artifact naming.
+##@ param: hostname string? Hostname written into the rootfs.
+##@ param: init string? Init system name.
+##@ param: packageManager string? Package manager name.
+##@ param: nixosSystem attrset? Optional nixosSystem used to derive kernel and modules.
+##@ param: kernel derivation? Optional explicit kernel override.
+##@ param: modulesTree derivation? Optional explicit modules tree override.
+##@ param: includeKernelModules bool? Automatically import /lib/modules/<version>.
+##@ param: buildTarball bool? Build a tarball artifact.
+##@ param: buildImage bool? Build an image artifact.
+##@ returns: attrset containing config, normalizedSpec, rootfs, tarball, image, and meta.
+##@ example: antinixLib.mkSystem { name = "demo"; init = "openrc"; packageManager = "xbps"; buildImage = true; nixosSystem = kernelSystem; }
+
 args@{
   name ? null,
   hostname ? "localhost",
@@ -111,22 +124,28 @@ args@{
 }:
 let
 
-
   effectiveKernel =
-    if kernel != null then kernel
-    else if nixosSystem != null then nixosSystem.config.system.build.kernel
-    else null;
+    if kernel != null then
+      kernel
+    else if nixosSystem != null then
+      nixosSystem.config.system.build.kernel
+    else
+      null;
 
   effectiveModulesTree =
-    if modulesTree != null then modulesTree
-    else if nixosSystem != null then nixosSystem.config.system.modulesTree
-    else if effectiveKernel != null && effectiveKernel ? modules then effectiveKernel.modules
-    else if effectiveKernel != null && effectiveKernel ? dev then effectiveKernel.dev
-    else effectiveKernel;
+    if modulesTree != null then
+      modulesTree
+    else if nixosSystem != null then
+      nixosSystem.config.system.modulesTree
+    else if effectiveKernel != null && effectiveKernel ? modules then
+      effectiveKernel.modules
+    else if effectiveKernel != null && effectiveKernel ? dev then
+      effectiveKernel.dev
+    else
+      effectiveKernel;
 
   kernelVersion =
-    if effectiveKernel == null then null
-    else effectiveKernel.modDirVersion or effectiveKernel.version;
+    if effectiveKernel == null then null else effectiveKernel.modDirVersion or effectiveKernel.version;
 
   kernelImports =
     if effectiveKernel != null && includeKernelModules then
@@ -138,26 +157,19 @@ let
     else
       { };
 
-  kernelAllowedStorePrefixes =
-    lib.unique (
-      lib.optional (effectiveModulesTree != null) (toString effectiveModulesTree)
-      ++ lib.optional (effectiveKernel != null) (toString effectiveKernel)
-    );
+  kernelAllowedStorePrefixes = lib.unique (
+    lib.optional (effectiveModulesTree != null) (toString effectiveModulesTree)
+    ++ lib.optional (effectiveKernel != null) (toString effectiveKernel)
+  );
 
-  effectivePatching =
-    patching
-    // {
-      allowedStorePrefixes =
-        lib.unique (
-          kernelAllowedStorePrefixes
-          ++ (patching.allowedStorePrefixes or [ ])
-        );
-    };
+  effectivePatching = patching // {
+    allowedStorePrefixes = lib.unique (
+      kernelAllowedStorePrefixes ++ (patching.allowedStorePrefixes or [ ])
+    );
+  };
 
   isCallableFragment =
-    fragment:
-    builtins.isFunction fragment || (builtins.isAttrs fragment && fragment ? __functor);
-
+    fragment: builtins.isFunction fragment || (builtins.isAttrs fragment && fragment ? __functor);
 
   fragmentFunctionArgs =
     fragment:
@@ -205,49 +217,50 @@ let
     patching = effectivePatching;
   };
 
-  mergedFragment =
-    merge.mergeMany (
-      [
-        initFragment
-        packageManagerFragment
-      ]
-      ++ fragments
-      ++ [ userBaseFragment ]
-    );
+  mergedFragment = merge.mergeMany (
+    [
+      initFragment
+      packageManagerFragment
+    ]
+    ++ fragments
+    ++ [ userBaseFragment ]
+  );
 
   normalizedSpec = normalize mergedFragment;
 
-  systemName =
-    if normalizedSpec.name != null then normalizedSpec.name else "rootfs";
+  systemName = if normalizedSpec.name != null then normalizedSpec.name else "rootfs";
 
   rootfs = mkRootfsTree normalizedSpec;
 
   tarball =
-    if buildTarball && mkRootfsTarball != null
-    then mkRootfsTarball {
-      rootfs = rootfs;
-      name = systemName;
-      users = normalizedSpec.users or { };
-      groups = normalizedSpec.groups or { };
-    }
-    else null;
+    if buildTarball && mkRootfsTarball != null then
+      mkRootfsTarball {
+        rootfs = rootfs;
+        name = systemName;
+        users = normalizedSpec.users or { };
+        groups = normalizedSpec.groups or { };
+      }
+    else
+      null;
 
   image =
-    if buildImage && mkRootfsImage != null
-    then mkRootfsImage {
-      rootfsTarball =
-        if tarball != null
-        then tarball
-        else mkRootfsTarball {
-          rootfs = rootfs;
-          name = systemName;
-          users = normalizedSpec.users or { };
-          groups = normalizedSpec.groups or { };
-        };
-      name = systemName;
-      volumeLabel = systemName;
-    }
-    else null;
+    if buildImage && mkRootfsImage != null then
+      mkRootfsImage {
+        rootfsTarball =
+          if tarball != null then
+            tarball
+          else
+            mkRootfsTarball {
+              rootfs = rootfs;
+              name = systemName;
+              users = normalizedSpec.users or { };
+              groups = normalizedSpec.groups or { };
+            };
+        name = systemName;
+        volumeLabel = systemName;
+      }
+    else
+      null;
 in
 {
   inherit
@@ -262,11 +275,9 @@ in
 
   config = normalizedSpec;
 
-  meta =
-    (normalizedSpec.meta or { })
-    // {
-      systemName = systemName;
-      selectedInit = init;
-      selectedPackageManager = packageManager;
-    };
+  meta = (normalizedSpec.meta or { }) // {
+    systemName = systemName;
+    selectedInit = init;
+    selectedPackageManager = packageManager;
+  };
 }

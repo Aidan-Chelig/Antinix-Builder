@@ -37,29 +37,29 @@ in
 
   packages = basePackages ++ extraTracePackages;
 
-groups = {
-  uucp = {
-    gid = 14;
+  groups = {
+    uucp = {
+      gid = 14;
+    };
   };
-};
 
   files = {
 
-"/etc/local.d/unix-chkpwd.start" = {
-  text = ''
-    #!/bin/sh
-    set -eu
+    "/etc/local.d/unix-chkpwd.start" = {
+      text = ''
+        #!/bin/sh
+        set -eu
 
-    mkdir -p /run/wrappers/bin
+        mkdir -p /run/wrappers/bin
 
-    if [ -x /usr/bin/unix_chkpwd ]; then
-      ln -sf /usr/bin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
-    elif [ -x /usr/sbin/unix_chkpwd ]; then
-      ln -sf /usr/sbin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
-    fi
-  '';
-  mode = "0755";
-};
+        if [ -x /usr/bin/unix_chkpwd ]; then
+          ln -sf /usr/bin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
+        elif [ -x /usr/sbin/unix_chkpwd ]; then
+          ln -sf /usr/sbin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
+        fi
+      '';
+      mode = "0755";
+    };
 
     "/etc/securetty" = {
       text = ''
@@ -118,9 +118,9 @@ groups = {
 
     "/etc/pam.d/login" = {
       text = ''
-auth       required   /usr/lib/security/pam_unix.so
-account    required   /usr/lib/security/pam_unix.so
-session    sufficient /usr/lib/security/pam_permit.so
+        auth       required   /usr/lib/security/pam_unix.so
+        account    required   /usr/lib/security/pam_unix.so
+        session    sufficient /usr/lib/security/pam_permit.so
       '';
       mode = "0644";
     };
@@ -244,62 +244,60 @@ session    sufficient /usr/lib/security/pam_permit.so
     };
   };
 
-symlinks = {
-  "/sbin/init" = "/usr/bin/openrc-init";
-  "/sbin/openrc" = "/usr/bin/openrc";
-  "/sbin/openrc-run" = "/usr/bin/openrc-run";
-  "/sbin/agetty" = "/usr/bin/agetty";
-  "/bin/login" = "/usr/bin/login";
-  "/etc/runlevels/default/local" = "/etc/init.d/local";
+  symlinks = {
+    "/sbin/init" = "/usr/bin/openrc-init";
+    "/sbin/openrc" = "/usr/bin/openrc";
+    "/sbin/openrc-run" = "/usr/bin/openrc-run";
+    "/sbin/agetty" = "/usr/bin/agetty";
+    "/bin/login" = "/usr/bin/login";
+    "/etc/runlevels/default/local" = "/etc/init.d/local";
 
-  "/etc/init.d/agetty.${console}" = "/etc/init.d/agetty";
-  "/etc/runlevels/default/agetty.${console}" = "/etc/init.d/agetty.${console}";
-}
-// lib.optionalAttrs (console == "ttyS0") {
-  "/etc/init.d/agetty.tty1" = "/etc/init.d/agetty";
-  "/etc/runlevels/default/agetty.tty1" = "/etc/init.d/agetty.tty1";
-};
-
-
-
-patching = {
-  makeExecutable = [
-    "/init"
-    "/usr/local/bin/openrc-debug"
-  ]
-  ++ lib.optionals enablePasswdTrace [
-    "/usr/local/bin/passwd-trace"
-  ];
-
-  textPatches = [
-    {
-      from = "${bin pkgs.shadow}/login";
-      to = "/usr/bin/login";
-      requireTargetExists = true;
-      targetKind = "executable";
-    }
-  ];
-
-binaryPatches = [
-  {
-    file = "/usr/bin/agetty";
-    from = "${bin pkgs.shadow}/login";
-    to = "/usr/bin/login";
-    requireTargetExists = true;
-    targetKind = "executable";
+    "/etc/init.d/agetty.${console}" = "/etc/init.d/agetty";
+    "/etc/runlevels/default/agetty.${console}" = "/etc/init.d/agetty.${console}";
   }
-];
-
-  elfPatches = [ ];
-
-  ignore = {
-    globs = [
-      "/usr/share/terminfo/*"
-      "/usr/share/zoneinfo/*"
-      "/usr/share/keymaps/*"
-    ];
+  // lib.optionalAttrs (console == "ttyS0") {
+    "/etc/init.d/agetty.tty1" = "/etc/init.d/agetty";
+    "/etc/runlevels/default/agetty.tty1" = "/etc/init.d/agetty.tty1";
   };
-};
+
+  patching = {
+    makeExecutable = [
+      "/init"
+      "/usr/local/bin/openrc-debug"
+    ]
+    ++ lib.optionals enablePasswdTrace [
+      "/usr/local/bin/passwd-trace"
+    ];
+
+    textPatches = [
+      {
+        from = "${bin pkgs.shadow}/login";
+        to = "/usr/bin/login";
+        requireTargetExists = true;
+        targetKind = "executable";
+      }
+    ];
+
+    binaryPatches = [
+      {
+        file = "/usr/bin/agetty";
+        from = "${bin pkgs.shadow}/login";
+        to = "/usr/bin/login";
+        requireTargetExists = true;
+        targetKind = "executable";
+      }
+    ];
+
+    elfPatches = [ ];
+
+    ignore = {
+      globs = [
+        "/usr/share/terminfo/*"
+        "/usr/share/zoneinfo/*"
+        "/usr/share/keymaps/*"
+      ];
+    };
+  };
 
   postBuild = [
     ''

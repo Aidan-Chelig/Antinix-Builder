@@ -12,16 +12,14 @@
 
 spec:
 let
-  systemName =
-    if spec.name != null then spec.name else "rootfs";
+  systemName = if spec.name != null then spec.name else "rootfs";
 
-  accountData =
-    accounts.build {
-      users = spec.users or { };
-      groups = spec.groups or { };
-      hostname = spec.hostname or "localhost";
-      profileExtraText = "";
-    };
+  accountData = accounts.build {
+    users = spec.users or { };
+    groups = spec.groups or { };
+    hostname = spec.hostname or "localhost";
+    profileExtraText = "";
+  };
 
   generatedFiles = {
     "/etc/passwd" = {
@@ -60,41 +58,35 @@ let
     };
   };
 
-  generatedDirectories =
-    accountData.homeDirs;
+  generatedDirectories = accountData.homeDirs;
 
-  mergedFiles =
-    generatedFiles // (spec.files or { });
+  mergedFiles = generatedFiles // (spec.files or { });
 
-  mergedDirectories =
-    generatedDirectories // (spec.directories or { });
+  mergedDirectories = generatedDirectories // (spec.directories or { });
 
-  baseTree =
-    overlay.build {
-      name = "${systemName}-base-tree";
-      packagesEnv = null;
-      files = mergedFiles;
-      directories = mergedDirectories;
-      symlinks = spec.symlinks or { };
-      imports = spec.imports or { };
-    };
+  baseTree = overlay.build {
+    name = "${systemName}-base-tree";
+    packagesEnv = null;
+    files = mergedFiles;
+    directories = mergedDirectories;
+    symlinks = spec.symlinks or { };
+    imports = spec.imports or { };
+  };
 
-  packageClosure =
-    pkgs.closureInfo {
-      rootPaths = spec.packages or [ ];
-    };
+  packageClosure = pkgs.closureInfo {
+    rootPaths = spec.packages or [ ];
+  };
 
   closurePathsFile = "${packageClosure}/store-paths";
 
-  patcherConfigValue =
-    patcherConfig.build {
-      inherit spec;
-      rootfsPath = baseTree;
-    };
+  patcherConfigValue = patcherConfig.build {
+    inherit spec;
+    rootfsPath = baseTree;
+  };
 
-  patcherConfigJson =
-    writeText "${systemName}-rootfs-patcher-config.json"
-      (builtins.toJSON patcherConfigValue);
+  patcherConfigJson = writeText "${systemName}-rootfs-patcher-config.json" (
+    builtins.toJSON patcherConfigValue
+  );
 
 in
 runCommand "${systemName}-rootfs-tree"
@@ -108,31 +100,31 @@ runCommand "${systemName}-rootfs-tree"
     ];
   }
   ''
-    set -euo pipefail
+        set -euo pipefail
 
-    mkdir -p "$out"
-    cp -a "${baseTree}/." "$out/"
-    chmod u+w "$out"
-    chmod -R u+w "$out" 2>/dev/null || true
-
-
-echo "=== pre-process agetty check ==="
-find "$out" \( -name agetty -o -name login \) -print 2>&1 || true
-ls -l "$out/usr/bin/agetty" "$out/usr/sbin/agetty" "$out/sbin/agetty" 2>&1 || true
-
-    "${rootfsPatcher}/bin/rootfs-patcher" merge \
-      --root "$out" \
-      --closure-paths-file "${closurePathsFile}" \
-      --data-dir share
-
-    chmod u+w "$out"
-    chmod -R u+w "$out" 2>/dev/null || true
+        mkdir -p "$out"
+        cp -a "${baseTree}/." "$out/"
+        chmod u+w "$out"
+        chmod -R u+w "$out" 2>/dev/null || true
 
 
-    "${rootfsPatcher}/bin/rootfs-patcher" process \
-      --root "$out" \
-      --config "${patcherConfigJson}" \
-      --allowed-prefixes-file "${closurePathsFile}"
+    echo "=== pre-process agetty check ==="
+    find "$out" \( -name agetty -o -name login \) -print 2>&1 || true
+    ls -l "$out/usr/bin/agetty" "$out/usr/sbin/agetty" "$out/sbin/agetty" 2>&1 || true
 
-    ${lib.concatStringsSep "\n" (spec.postBuild or [ ])}
+        "${rootfsPatcher}/bin/rootfs-patcher" merge \
+          --root "$out" \
+          --closure-paths-file "${closurePathsFile}" \
+          --data-dir share
+
+        chmod u+w "$out"
+        chmod -R u+w "$out" 2>/dev/null || true
+
+
+        "${rootfsPatcher}/bin/rootfs-patcher" process \
+          --root "$out" \
+          --config "${patcherConfigJson}" \
+          --allowed-prefixes-file "${closurePathsFile}"
+
+        ${lib.concatStringsSep "\n" (spec.postBuild or [ ])}
   ''

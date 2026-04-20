@@ -1,0 +1,9 @@
+pre-commit:
+  parallel: false
+  commands:
+    build-api-reference:
+      run: |
+        out="$(nix build .#api-reference --no-link --print-out-paths | tail -n1)"
+        cmp -s "$out/API.md" ./API.md || cp -f "$out/API.md" ./API.md
+        git add ./API.md
+      stage_fixed: true

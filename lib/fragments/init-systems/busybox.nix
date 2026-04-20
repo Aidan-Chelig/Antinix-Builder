@@ -142,10 +142,10 @@ in
     };
   };
 
-symlinks = {
-  "/sbin/init" = "/usr/bin/busybox";
-  "/bin/busybox" = "/usr/bin/busybox";
-};
+  symlinks = {
+    "/sbin/init" = "/usr/bin/busybox";
+    "/bin/busybox" = "/usr/bin/busybox";
+  };
 
   postBuild = [
     ''
@@ -177,17 +177,15 @@ symlinks = {
     providesInit = true;
   };
 
-patching = {
-  makeExecutable = [
-    "/init"
-    "/etc/init.d/rcS"
-  ]
-  ++ lib.optionals enablePasswdTrace [
-    "/usr/local/bin/passwd-trace"
-  ];
-};
-
-
+  patching = {
+    makeExecutable = [
+      "/init"
+      "/etc/init.d/rcS"
+    ]
+    ++ lib.optionals enablePasswdTrace [
+      "/usr/local/bin/passwd-trace"
+    ];
+  };
 
 }
 

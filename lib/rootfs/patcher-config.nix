@@ -92,11 +92,11 @@ let
 
   defaultValidation = {
     forbid_absolute_store_symlinks = true;
-  forbid_absolute_internal_symlinks = true;
-  absolute_internal_symlink_scan_roots = [
-    "/bin"
-    "/sbin"
-  ];
+    forbid_absolute_internal_symlinks = true;
+    absolute_internal_symlink_scan_roots = [
+      "/bin"
+      "/sbin"
+    ];
     expected_interpreter = null;
     interpreter_scan_roots = [
       "/bin"
@@ -115,33 +115,29 @@ let
 
   normalizePatchList =
     patches:
-    map
-      (patch:
-        {
-          from = patch.from;
-          to = patch.to;
-          require_target_exists = patch.requireTargetExists or false;
-          target_kind = patch.targetKind or null;
-        }
-        // lib.optionalAttrs (patch ? file && patch.file != null) {
-          file = patch.file;
-        })
-      patches;
+    map (
+      patch:
+      {
+        from = patch.from;
+        to = patch.to;
+        require_target_exists = patch.requireTargetExists or false;
+        target_kind = patch.targetKind or null;
+      }
+      // lib.optionalAttrs (patch ? file && patch.file != null) {
+        file = patch.file;
+      }
+    ) patches;
 
   attrTextRewritesToList =
     rewrites:
-    map
-      (from: {
-        inherit from;
-        to = rewrites.${from};
-        require_target_exists = false;
-        target_kind = null;
-      })
-      (builtins.attrNames rewrites);
+    map (from: {
+      inherit from;
+      to = rewrites.${from};
+      require_target_exists = false;
+      target_kind = null;
+    }) (builtins.attrNames rewrites);
 
-  directoryKeys =
-    dirs:
-    builtins.attrNames dirs;
+  directoryKeys = dirs: builtins.attrNames dirs;
 
   chooseExpectedInterpreter =
     runtimeLayout:
@@ -173,124 +169,76 @@ in
 
       declaredDirectoryPaths = directoryKeys (spec.directories or { });
 
-      strictScanRoots =
-        mergeUnique
-          defaultStrictScanRoots
-          (
-            (patching.strictScanRoots or [ ])
-            ++ (patching.extraSearchPaths or [ ])
-          );
+      strictScanRoots = mergeUnique defaultStrictScanRoots (
+        (patching.strictScanRoots or [ ]) ++ (patching.extraSearchPaths or [ ])
+      );
 
-      warnScanRoots =
-        mergeUnique
-          defaultWarnScanRoots
-          (
-            (patching.warnScanRoots or [ ])
-            ++ declaredDirectoryPaths
-          );
+      warnScanRoots = mergeUnique defaultWarnScanRoots (
+        (patching.warnScanRoots or [ ]) ++ declaredDirectoryPaths
+      );
 
-      autoPatch =
-        defaultAutoPatch
-        // {
-          rewrite_embedded_store_paths =
-            runtimeIn.normalizeStorePaths or defaultAutoPatch.rewrite_embedded_store_paths;
+      autoPatch = defaultAutoPatch // {
+        rewrite_embedded_store_paths =
+          runtimeIn.normalizeStorePaths or defaultAutoPatch.rewrite_embedded_store_paths;
 
-          default_interpreter = expectedInterpreter;
-        };
+        default_interpreter = expectedInterpreter;
+      };
 
-      runtimeLayout =
-        defaultRuntimeLayout
-        // {
-          detect_interpreter_from =
-            mergeUnique
-              defaultRuntimeLayout.detect_interpreter_from
-              (
-                (patching.detectInterpreterFrom or [ ])
-                ++ lib.optionals ((spec.files or { }) ? "/init") [ "/init" ]
-              );
+      runtimeLayout = defaultRuntimeLayout // {
+        detect_interpreter_from = mergeUnique defaultRuntimeLayout.detect_interpreter_from (
+          (patching.detectInterpreterFrom or [ ]) ++ lib.optionals ((spec.files or { }) ? "/init") [ "/init" ]
+        );
 
-          interpreter_fallback_scan_roots =
-            mergeUnique
-              defaultRuntimeLayout.interpreter_fallback_scan_roots
-              (patching.interpreterFallbackScanRoots or [ ]);
+        interpreter_fallback_scan_roots = mergeUnique defaultRuntimeLayout.interpreter_fallback_scan_roots (
+          patching.interpreterFallbackScanRoots or [ ]
+        );
 
-          lib_roots =
-            mergeUnique
-              defaultRuntimeLayout.lib_roots
-              (patching.libRoots or [ ]);
+        lib_roots = mergeUnique defaultRuntimeLayout.lib_roots (patching.libRoots or [ ]);
 
-          lib64_roots =
-            mergeUnique
-              defaultRuntimeLayout.lib64_roots
-              (patching.lib64Roots or [ ]);
+        lib64_roots = mergeUnique defaultRuntimeLayout.lib64_roots (patching.lib64Roots or [ ]);
 
-          install_detected_interpreter_to =
-            patching.installDetectedInterpreterTo
-            or defaultRuntimeLayout.install_detected_interpreter_to;
+        install_detected_interpreter_to =
+          patching.installDetectedInterpreterTo or defaultRuntimeLayout.install_detected_interpreter_to;
 
-          normalize_runtime_layout = true;
-        };
+        normalize_runtime_layout = true;
+      };
 
-      expectedInterpreter =
-        validationIn.expectedInterpreter
-        or (chooseExpectedInterpreter runtimeLayout);
+      expectedInterpreter = validationIn.expectedInterpreter or (chooseExpectedInterpreter runtimeLayout);
 
-      validation =
-        defaultValidation
-        // {
-          interpreter_scan_roots =
-            mergeUnique
-              defaultValidation.interpreter_scan_roots
-              (validationIn.interpreterScanRoots or [ ]);
+      validation = defaultValidation // {
+        interpreter_scan_roots = mergeUnique defaultValidation.interpreter_scan_roots (
+          validationIn.interpreterScanRoots or [ ]
+        );
 
-          forbid_absolute_store_symlinks =
-            validationIn.forbidAbsoluteStoreSymlinks
-            or defaultValidation.forbid_absolute_store_symlinks;
+        forbid_absolute_store_symlinks =
+          validationIn.forbidAbsoluteStoreSymlinks or defaultValidation.forbid_absolute_store_symlinks;
 
-          expected_interpreter = expectedInterpreter;
-        };
+        expected_interpreter = expectedInterpreter;
+      };
 
-      chmod =
-        defaultChmod
-        // {
-          make_executable =
-            mergeUnique
-              defaultChmod.make_executable
-              (patching.makeExecutable or [ ]);
-        };
+      chmod = defaultChmod // {
+        make_executable = mergeUnique defaultChmod.make_executable (patching.makeExecutable or [ ]);
+      };
 
       textRewrites =
         attrTextRewritesToList (patching.textRewrites or { })
         ++ normalizePatchList (patching.textPatches or [ ]);
 
-      binaryRewrites =
-        normalizePatchList (patching.binaryPatches or [ ]);
+      binaryRewrites = normalizePatchList (patching.binaryPatches or [ ]);
 
-      elfPatches =
-        map
-          (patch:
-            {
-              file = patch.file;
-              interpreter = patch.interpreter or null;
-              rpath = patch.rpath or null;
-            })
-          (patching.elfPatches or [ ]);
+      elfPatches = map (patch: {
+        file = patch.file;
+        interpreter = patch.interpreter or null;
+        rpath = patch.rpath or null;
+      }) (patching.elfPatches or [ ]);
 
-      ignoreGlobs =
-        mergeUnique
-          defaultIgnoreGlobs
-          (ignore.globs or [ ]);
+      ignoreGlobs = mergeUnique defaultIgnoreGlobs (ignore.globs or [ ]);
 
-      ignoreExtensions =
-        mergeUnique
-          defaultIgnoreExtensions
-          (ignore.extensions or [ ]);
+      ignoreExtensions = mergeUnique defaultIgnoreExtensions (ignore.extensions or [ ]);
 
-      allowedStorePrefixes =
-        lib.unique (patching.allowedStorePrefixes or [ ]);
+      allowedStorePrefixes = lib.unique (patching.allowedStorePrefixes or [ ]);
 
-      forbiddenStorePaths =
-        lib.unique (patching.forbiddenStorePaths or [ ]);
+      forbiddenStorePaths = lib.unique (patching.forbiddenStorePaths or [ ]);
     in
     {
       auto_patch = autoPatch;

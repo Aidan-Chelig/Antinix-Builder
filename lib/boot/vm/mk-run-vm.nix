@@ -77,43 +77,68 @@ let
   appendLine = lib.concatStringsSep " " (defaultKernelParams ++ kernelParams);
 
   baseArgs = [
-    "-m" (toString memoryMB)
-    "-smp" (toString cpus)
-    "-kernel" (toString kernelImage)
-    "-initrd" (toString initrd)
-    "-append" appendLine
+    "-m"
+    (toString memoryMB)
+    "-smp"
+    (toString cpus)
+    "-kernel"
+    (toString kernelImage)
+    "-initrd"
+    (toString initrd)
+    "-append"
+    appendLine
   ];
 
-  x86Args =
-    [
-      "-machine" "pc"
-      "-display" display
-      "-serial" "stdio"
-      "-monitor" "none"
-      "-device" "virtio-gpu-pci"
-      "-device" "qemu-xhci"
-      "-device" "usb-kbd"
-      "-device" "usb-mouse"
-    ]
-    ++ lib.optionals net [
-      "-nic" "user,model=virtio-net-pci"
-    ];
+  x86Args = [
+    "-machine"
+    "pc"
+    "-display"
+    display
+    "-serial"
+    "stdio"
+    "-monitor"
+    "none"
+    "-device"
+    "virtio-gpu-pci"
+    "-device"
+    "qemu-xhci"
+    "-device"
+    "usb-kbd"
+    "-device"
+    "usb-mouse"
+  ]
+  ++ lib.optionals net [
+    "-nic"
+    "user,model=virtio-net-pci"
+  ];
 
-  aarch64Args =
-    [
-      "-M" "virt"
-      "-cpu" "cortex-a72"
-      "-device" "virtio-rng-pci"
-      "-serial" "stdio"
-      "-monitor" "none"
-    ]
-    ++ lib.optionals net [
-      "-nic" "user,model=virtio-net-pci"
-    ];
+  aarch64Args = [
+    "-M"
+    "virt"
+    "-cpu"
+    "cortex-a72"
+    "-device"
+    "virtio-rng-pci"
+    "-serial"
+    "stdio"
+    "-monitor"
+    "none"
+  ]
+  ++ lib.optionals net [
+    "-nic"
+    "user,model=virtio-net-pci"
+  ];
 
   qemuArgs =
     baseArgs
-    ++ (if guestIsX86 then x86Args else if guestIsAarch64 then aarch64Args else [ ])
+    ++ (
+      if guestIsX86 then
+        x86Args
+      else if guestIsAarch64 then
+        aarch64Args
+      else
+        [ ]
+    )
     ++ extraQemuArgs;
 
   renderArg = arg: "    ${lib.escapeShellArg arg}";
@@ -121,45 +146,45 @@ let
 
 in
 writeShellScriptBin name ''
-  set -euo pipefail
+    set -euo pipefail
 
-  echo "hostSystem=${hostSystem}"
-  echo "guestSystem=${guestSystem}"
+    echo "hostSystem=${hostSystem}"
+    echo "guestSystem=${guestSystem}"
 
-  WORKDIR="''${XDG_CACHE_HOME:-$HOME/.cache}/${cacheDirName}"
-  mkdir -p "$WORKDIR"
+    WORKDIR="''${XDG_CACHE_HOME:-$HOME/.cache}/${cacheDirName}"
+    mkdir -p "$WORKDIR"
 
-  IMAGE="$WORKDIR/${name}.img"
+    IMAGE="$WORKDIR/${name}.img"
 
-  if ${if reuseCachedImage then "true" else "false"}; then
-    if [ ! -e "$IMAGE" ]; then
-      echo "No existing writable image at: $IMAGE" >&2
-      echo "Run the fresh-image launcher once first or create it manually." >&2
-      exit 1
+    if ${if reuseCachedImage then "true" else "false"}; then
+      if [ ! -e "$IMAGE" ]; then
+        echo "No existing writable image at: $IMAGE" >&2
+        echo "Run the fresh-image launcher once first or create it manually." >&2
+        exit 1
+      fi
+    else
+      cp -f "${rootfsImage}" "$IMAGE"
+      chmod u+w "$IMAGE"
     fi
-  else
-    cp -f "${rootfsImage}" "$IMAGE"
-    chmod u+w "$IMAGE"
-  fi
 
-  args=(
-${argsBlock}
-  )
-
-  if [ "${guestSystem}" = "x86_64-linux" ]; then
-    args+=(
-      "-drive" "file=$IMAGE,format=raw,if=none,id=drv0"
-      "-device" "virtio-blk-pci,drive=drv0,id=virtio0"
+    args=(
+  ${argsBlock}
     )
-  elif [ "${guestSystem}" = "aarch64-linux" ]; then
-    args+=(
-      "-drive" "file=$IMAGE,format=raw,if=none,id=vdisk"
-      "-device" "virtio-blk-device,drive=vdisk"
-    )
-  fi
 
-  printf 'QEMU CMD: %q ' "${qemuBinary}" "''${args[@]}"
-  printf '\n'
+    if [ "${guestSystem}" = "x86_64-linux" ]; then
+      args+=(
+        "-drive" "file=$IMAGE,format=raw,if=none,id=drv0"
+        "-device" "virtio-blk-pci,drive=drv0,id=virtio0"
+      )
+    elif [ "${guestSystem}" = "aarch64-linux" ]; then
+      args+=(
+        "-drive" "file=$IMAGE,format=raw,if=none,id=vdisk"
+        "-device" "virtio-blk-device,drive=vdisk"
+      )
+    fi
 
-  exec "${qemuBinary}" "''${args[@]}"
+    printf 'QEMU CMD: %q ' "${qemuBinary}" "''${args[@]}"
+    printf '\n'
+
+    exec "${qemuBinary}" "''${args[@]}"
 ''

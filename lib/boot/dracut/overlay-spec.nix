@@ -328,19 +328,15 @@ let
     "power"
   ];
 
-  commandNames =
-    lib.unique (lib.concatLists (map (setName: overlaySets.${setName}) enabledSets));
+  commandNames = lib.unique (lib.concatLists (map (setName: overlaySets.${setName}) enabledSets));
 
-  commands =
-    map
-      (
-        name:
-        let
-          spec = commandCatalog.${name};
-        in
-        spec // { inherit name; }
-      )
-      commandNames;
+  commands = map (
+    name:
+    let
+      spec = commandCatalog.${name};
+    in
+    spec // { inherit name; }
+  ) commandNames;
 
 in
 {

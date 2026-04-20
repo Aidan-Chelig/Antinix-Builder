@@ -1,14 +1,15 @@
-{ lib, pkgs, runCommand }:
+{
+  lib,
+  pkgs,
+  runCommand,
+}:
 
 let
   q = lib.escapeShellArg;
 
-  normalizeRootfsPath = path:
-    if lib.hasPrefix "/" path then path else "/${path}";
+  normalizeRootfsPath = path: if lib.hasPrefix "/" path then path else "/${path}";
 
-  splitPath =
-    path:
-    builtins.filter (x: x != "") (lib.splitString "/" (normalizeRootfsPath path));
+  splitPath = path: builtins.filter (x: x != "") (lib.splitString "/" (normalizeRootfsPath path));
 
   makeRelativeTarget =
     from: to:
@@ -17,9 +18,10 @@ let
       toParts = splitPath to;
 
       fromDirParts =
-        if builtins.length fromParts == 0
-        then [ ]
-        else lib.sublist 0 ((builtins.length fromParts) - 1) fromParts;
+        if builtins.length fromParts == 0 then
+          [ ]
+        else
+          lib.sublist 0 ((builtins.length fromParts) - 1) fromParts;
 
       commonLen =
         let
@@ -43,13 +45,11 @@ let
     in
     if relParts == [ ] then "." else lib.concatStringsSep "/" relParts;
 
-  mkDirectorySnippet = relPath: dir:
+  mkDirectorySnippet =
+    relPath: dir:
     let
       path = normalizeRootfsPath relPath;
-      modeLine =
-        if (dir.mode or null) != null
-        then ''chmod ${q dir.mode} "$out${path}"''
-        else "";
+      modeLine = if (dir.mode or null) != null then ''chmod ${q dir.mode} "$out${path}"'' else "";
     in
     ''
       mkdir -p "$(dirname "$out${path}")"
@@ -57,7 +57,8 @@ let
       ${modeLine}
     '';
 
-  mkFileSnippet = relPath: file:
+  mkFileSnippet =
+    relPath: file:
     let
       path = normalizeRootfsPath relPath;
 
@@ -67,10 +68,10 @@ let
       writeLine =
         if hasText && !hasSource then
           ''
-            mkdir -p "$(dirname "$out${path}")"
-            cat > "$out${path}" <<'EOF'
-${file.text}
-EOF
+                        mkdir -p "$(dirname "$out${path}")"
+                        cat > "$out${path}" <<'EOF'
+            ${file.text}
+            EOF
           ''
         else if hasSource && !hasText then
           ''
@@ -82,17 +83,15 @@ EOF
         else
           throw "overlay.nix: file entry ${path} must define exactly one of `text` or `source`";
 
-      modeLine =
-        if (file.mode or null) != null
-        then ''chmod ${q file.mode} "$out${path}"''
-        else "";
+      modeLine = if (file.mode or null) != null then ''chmod ${q file.mode} "$out${path}"'' else "";
     in
     ''
       ${writeLine}
       ${modeLine}
     '';
 
-  mkImportSnippet = relPath: imp:
+  mkImportSnippet =
+    relPath: imp:
     let
       path = normalizeRootfsPath relPath;
     in
@@ -103,13 +102,15 @@ EOF
       chmod -R u+w "$out${path}" 2>/dev/null || true
     '';
 
-  mkSymlinkSnippet = relPath: target:
+  mkSymlinkSnippet =
+    relPath: target:
     let
       path = normalizeRootfsPath relPath;
       finalTarget =
-        if lib.hasPrefix "/" target && !lib.hasPrefix "/nix/store/" target
-        then makeRelativeTarget path target
-        else target;
+        if lib.hasPrefix "/" target && !lib.hasPrefix "/nix/store/" target then
+          makeRelativeTarget path target
+        else
+          target;
     in
     ''
       mkdir -p "$(dirname "$out${path}")"
@@ -117,8 +118,7 @@ EOF
       ln -s ${q finalTarget} "$out${path}"
     '';
 
-  concatAttrSnippets = f: attrs:
-    lib.concatStringsSep "\n" (lib.mapAttrsToList f attrs);
+  concatAttrSnippets = f: attrs: lib.concatStringsSep "\n" (lib.mapAttrsToList f attrs);
 
 in
 {
@@ -139,20 +139,20 @@ in
         ];
       }
       ''
-        set -euo pipefail
+                set -euo pipefail
 
-        mkdir -p "$out"
+                mkdir -p "$out"
 
-        ${lib.optionalString (packagesEnv != null) ''
-          if [ -d "${packagesEnv}" ]; then
-            cp -aL "${packagesEnv}/." "$out/"
-            chmod -R u+w "$out" 2>/dev/null || true
-          fi
-        ''}
+                ${lib.optionalString (packagesEnv != null) ''
+                  if [ -d "${packagesEnv}" ]; then
+                    cp -aL "${packagesEnv}/." "$out/"
+                    chmod -R u+w "$out" 2>/dev/null || true
+                  fi
+                ''}
 
-${concatAttrSnippets mkDirectorySnippet directories}
-${concatAttrSnippets mkImportSnippet imports}
-${concatAttrSnippets mkFileSnippet files}
-${concatAttrSnippets mkSymlinkSnippet symlinks}
+        ${concatAttrSnippets mkDirectorySnippet directories}
+        ${concatAttrSnippets mkImportSnippet imports}
+        ${concatAttrSnippets mkFileSnippet files}
+        ${concatAttrSnippets mkSymlinkSnippet symlinks}
       '';
 }

@@ -45,107 +45,93 @@ let
     environment:
     let
       names = builtins.attrNames environment;
-      lines = map
-        (name:
-          let
-            value = builtins.toString environment.${name};
-          in
-          ''export ${name}=${lib.escapeShellArg value}''
-        )
-        names;
+      lines = map (
+        name:
+        let
+          value = builtins.toString environment.${name};
+        in
+        "export ${name}=${lib.escapeShellArg value}"
+      ) names;
     in
     lib.concatStringsSep "\n" lines + lib.optionalString (lines != [ ]) "\n";
 
   normalizeUser =
     name: user:
     let
-      base =
-        if name == "root"
-        then rootUserDefaults
-        else normalUserDefaults;
+      base = if name == "root" then rootUserDefaults else normalUserDefaults;
 
       merged = base // user;
 
-      finalGroup =
-        if merged.group != null then merged.group else name;
+      finalGroup = if merged.group != null then merged.group else name;
 
       finalHome =
-        if merged.home != null
-        then merged.home
-        else if name == "root"
-        then "/root"
-        else "/home/${name}";
+        if merged.home != null then
+          merged.home
+        else if name == "root" then
+          "/root"
+        else
+          "/home/${name}";
     in
-    merged // {
+    merged
+    // {
       group = finalGroup;
       home = finalHome;
       extraGroups = lib.unique (merged.extraGroups or [ ]);
     };
 
-  normalizeUsers =
-    users:
-    lib.mapAttrs normalizeUser users;
+  normalizeUsers = users: lib.mapAttrs normalizeUser users;
 
-  normalizeGroups =
-    groups:
-    lib.mapAttrs (_: group: groupDefaults // group) groups;
+  normalizeGroups = groups: lib.mapAttrs (_: group: groupDefaults // group) groups;
 
   groupsFromUsers =
-    users:
-    lib.mapAttrs'
-      (name: user:
-        lib.nameValuePair (user.group or name) { })
-      users;
+    users: lib.mapAttrs' (name: user: lib.nameValuePair (user.group or name) { }) users;
 
-  normalizeFiles =
-    files:
-    lib.mapAttrs
-      (_path: file:
-        fileDefaults // file
-      )
-      files;
+  normalizeFiles = files: lib.mapAttrs (_path: file: fileDefaults // file) files;
 
-  normalizeDirectories =
-    directories:
-    lib.mapAttrs
-      (_path: dir:
-        directoryDefaults // dir
-      )
-      directories;
+  normalizeDirectories = directories: lib.mapAttrs (_path: dir: directoryDefaults // dir) directories;
 
   motdFile =
     motd:
-    if motd == null then { } else {
-      "/etc/motd" = {
-        text = motd;
-        user = "root";
-        group = "root";
-        mode = "0644";
+    if motd == null then
+      { }
+    else
+      {
+        "/etc/motd" = {
+          text = motd;
+          user = "root";
+          group = "root";
+          mode = "0644";
+        };
       };
-    };
 
   environmentFiles =
     environment:
     let
       text = mkEnvProfileText environment;
     in
-    if environment == { } then { } else {
-      "/etc/profile.d/antinix-env.sh" = {
-        inherit text;
-        user = "root";
-        group = "root";
-        mode = "0644";
+    if environment == { } then
+      { }
+    else
+      {
+        "/etc/profile.d/antinix-env.sh" = {
+          inherit text;
+          user = "root";
+          group = "root";
+          mode = "0644";
+        };
       };
-    };
 
   runtimeDirectories =
     runtime:
     let
-      mkDirSet = paths:
-        builtins.listToAttrs (map (path: {
-          name = path;
-          value = { };
-        }) paths);
+      mkDirSet =
+        paths:
+        builtins.listToAttrs (
+          map (path: {
+            name = path;
+            value = { };
+          }) paths
+        );
     in
     mkDirSet (
       [
@@ -165,30 +151,20 @@ let
 
   normalizedUsers = normalizeUsers (merged.users or { });
 
-  inferredGroups =
-    groupsFromUsers normalizedUsers;
+  inferredGroups = groupsFromUsers normalizedUsers;
 
-  normalizedGroups =
-    normalizeGroups (
-      inferredGroups // (merged.groups or { })
-    );
+  normalizedGroups = normalizeGroups (inferredGroups // (merged.groups or { }));
 
-normalizedFiles =
-  normalizeFiles (
-    (motdFile merged.motd)
-    // (environmentFiles (merged.environment or { }))
-    // (merged.files or { })
+  normalizedFiles = normalizeFiles (
+    (motdFile merged.motd) // (environmentFiles (merged.environment or { })) // (merged.files or { })
   );
 
-  normalizedDirectories =
-    normalizeDirectories (
-      (runtimeDirectories (merged.runtime or { }))
-      // (merged.directories or { })
-    );
+  normalizedDirectories = normalizeDirectories (
+    (runtimeDirectories (merged.runtime or { })) // (merged.directories or { })
+  );
 in
 {
-  inherit
-    (merged)
+  inherit (merged)
     name
     hostname
     packages

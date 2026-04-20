@@ -7,6 +7,6 @@
   dinit = pkgs.callPackage ./dinit.nix { };
   s6 = pkgs.callPackage ./s6.nix { };
   openrc = pkgs.callPackage ./openrc.nix {
-     openrc = pkgs.callPackage ../../../pkgs/openrc.nix { };
+    openrc = pkgs.callPackage ../../../pkgs/openrc.nix { };
   };
 }

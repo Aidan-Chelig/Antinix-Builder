@@ -23,8 +23,14 @@ let
     # Service-ish / boot-ish configuration
     services = { };
     runtime = {
-      tmpfsDirs = [ "/tmp" "/run" ];
-      stateDirs = [ "/var/lib" "/var/log" ];
+      tmpfsDirs = [
+        "/tmp"
+        "/run"
+      ];
+      stateDirs = [
+        "/var/lib"
+        "/var/log"
+      ];
       dataDirs = [ "/srv" ];
     };
 
@@ -65,6 +71,16 @@ let
     meta = { };
   };
 
+  ##@ name: mkFile
+  ##@ kind: helper
+  ##@ summary: Define a file in the rootfs.
+  ##@ param: source path? Source file to copy.
+  ##@ param: text string? Inline file contents.
+  ##@ param: mode string? File mode (e.g. "0644").
+  ##@ param: user string Owner user.
+  ##@ param: group string Owner group.
+  ##@ returns: attrset describing a file entry.
+
   mkFile =
     {
       source ? null,
@@ -75,8 +91,22 @@ let
     }:
     assert (source != null) != (text != null);
     {
-      inherit source text mode user group;
+      inherit
+        source
+        text
+        mode
+        user
+        group
+        ;
     };
+
+  ##@ name: mkDirectory
+  ##@ kind: helper
+  ##@ summary: Define a directory in the rootfs.
+  ##@ param: mode string? Directory mode.
+  ##@ param: user string Owner user.
+  ##@ param: group string Owner group.
+  ##@ returns: attrset describing a directory.
 
   mkDirectory =
     {
@@ -88,6 +118,14 @@ let
       inherit mode user group;
     };
 
+  ##@ name: mkImport
+  ##@ kind: helper
+  ##@ summary: Import an existing filesystem tree into the rootfs.
+  ##@ param: source path Source directory to copy.
+  ##@ param: user string Owner user.
+  ##@ param: group string Owner group.
+  ##@ returns: attrset describing an import.
+
   mkImport =
     {
       source,
@@ -98,6 +136,17 @@ let
       inherit source user group;
     };
 
+  ##@ name: mkUser
+  ##@ kind: helper
+  ##@ summary: Define a system user.
+  ##@ param: uid int? User ID.
+  ##@ param: group string? Primary group.
+  ##@ param: extraGroups list Supplementary groups.
+  ##@ param: home string Home directory.
+  ##@ param: shell string Login shell.
+  ##@ param: hashedPassword string Pre-hashed password.
+  ##@ param: isNormalUser bool Whether user is a normal account.
+  ##@ returns: attrset describing a user.
   mkUser =
     {
       isNormalUser ? true,
@@ -111,7 +160,7 @@ let
       createHome ? true,
       description ? "",
     }:
-    assert ! (password != null && hashedPassword != null);
+    assert !(password != null && hashedPassword != null);
     {
       inherit
         isNormalUser
@@ -126,6 +175,12 @@ let
         description
         ;
     };
+
+  ##@ name: mkGroup
+  ##@ kind: helper
+  ##@ summary: Define a system group.
+  ##@ param: gid int? Group ID.
+  ##@ returns: attrset describing a group.
 
   mkGroup =
     {
