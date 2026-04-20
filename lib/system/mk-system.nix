@@ -14,6 +14,32 @@ let
   availableInitSystems = builtins.attrNames initSystems;
   availablePackageManagers = builtins.attrNames packageManagers;
 
+  effectiveKernel =
+    if kernel != null then kernel
+    else if nixosSystem != null then nixosSystem.config.system.build.kernel
+    else null;
+
+  effectiveModulesTree =
+    if modulesTree != null then modulesTree
+    else if nixosSystem != null then nixosSystem.config.system.modulesTree
+    else if effectiveKernel != null && effectiveKernel ? modules then effectiveKernel.modules
+    else if effectiveKernel != null && effectiveKernel ? dev then effectiveKernel.dev
+    else effectiveKernel;
+
+  kernelVersion =
+    if effectiveKernel == null then null
+    else effectiveKernel.modDirVersion or effectiveKernel.version;
+
+  kernelImports =
+    if effectiveKernel != null && includeKernelModules then
+      {
+        "/lib/modules/${kernelVersion}" = schema.mkImport {
+          source = "${effectiveModulesTree}/lib/modules/${kernelVersion}";
+        };
+      }
+    else
+      { };
+
   getInitFragment =
     init:
     initSystems.${init} or (throw ''
@@ -27,6 +53,7 @@ let
       Unknown package manager: ${packageManager}
       Available package managers: ${lib.concatStringsSep ", " availablePackageManagers}
     '');
+
 
 
 
@@ -94,6 +121,12 @@ args@{
   validation ? { },
   meta ? { },
 
+nixosSystem ? null,
+kernel ? null,
+modulesTree ? null,
+includeKernelModules ? true,
+
+
   buildTarball ? false,
   buildImage ? false,
 
@@ -147,6 +180,7 @@ let
       validation
       meta
       ;
+    imports = kernelImports // imports;
   };
 
   mergedFragment =
