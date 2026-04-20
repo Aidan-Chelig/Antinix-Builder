@@ -1,5 +1,16 @@
 # Antinix API Reference
 
+## antinixLib
+
+Top-level Antinix library exposing system builders and helpers.
+
+- **Kind:** `module`
+- **Source:** `lib/default.nix`
+
+### Returns
+
+- attrset containing mkSystem, mkInitrd, mkRunVm, schema, and utilities.
+
 ## mkInitrd
 
 Build a dracut initrd for a kernel or nixosSystem.
@@ -32,6 +43,28 @@ antinixLib.mkInitrd {
   ];
 }
 ```
+
+## mkRunVm
+
+Build a QEMU VM launcher for a rootfs image and initrd.
+
+- **Kind:** `function`
+- **Source:** `lib/boot/vm/mk-run-vm.nix`
+
+### Parameters
+
+- `name` *string* — Name of the generated script.
+- `rootfsImage` *path* — Rootfs image to boot.
+- `kernelImage` *path* — Kernel image (e.g. ${kernel}/bzImage).
+- `initrd` *path* — Initrd image.
+- `hostSystem` *string* — Host platform.
+- `guestSystem` *string* — Guest platform.
+- `memoryMB` *int?* — VM memory in MB.
+- `cpus` *int?* — Number of virtual CPUs.
+
+### Returns
+
+- derivation containing the VM launcher script.
 
 ## mkSystem
 

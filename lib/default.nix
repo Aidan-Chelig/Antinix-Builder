@@ -68,11 +68,10 @@ let
       ;
   };
 
-  ##@ name: libFor
-  ##@ kind: function
-  ##@ summary: Construct the Antinix library for a target system.
-  ##@ param: system string Target platform (e.g. x86_64-linux).
-  ##@ returns: attrset exposing mkSystem, mkInitrd, mkRunVm, schema, initSystems, and packageManagers.
+##@ name: antinixLib
+##@ kind: module
+##@ summary: Top-level Antinix library exposing system builders and helpers.
+##@ returns: attrset containing mkSystem, mkInitrd, mkRunVm, schema, and utilities.
 in
 {
   inherit

@@ -4,6 +4,19 @@
   writeShellScriptBin,
 }:
 
+##@ name: mkRunVm
+##@ kind: function
+##@ summary: Build a QEMU VM launcher for a rootfs image and initrd.
+##@ param: name string Name of the generated script.
+##@ param: rootfsImage path Rootfs image to boot.
+##@ param: kernelImage path Kernel image (e.g. ${kernel}/bzImage).
+##@ param: initrd path Initrd image.
+##@ param: hostSystem string Host platform.
+##@ param: guestSystem string Guest platform.
+##@ param: memoryMB int? VM memory in MB.
+##@ param: cpus int? Number of virtual CPUs.
+##@ returns: derivation containing the VM launcher script.
+
 {
   name,
   rootfsImage,
