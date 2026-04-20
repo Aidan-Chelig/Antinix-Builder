@@ -48,10 +48,13 @@ groups = {
 "/etc/local.d/unix-chkpwd.start" = {
   text = ''
     #!/bin/sh
+    set -eu
+
     mkdir -p /run/wrappers/bin
-    if [ -e /usr/bin/unix_chkpwd ]; then
+
+    if [ -x /usr/bin/unix_chkpwd ]; then
       ln -sf /usr/bin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
-    elif [ -e /usr/sbin/unix_chkpwd ]; then
+    elif [ -x /usr/sbin/unix_chkpwd ]; then
       ln -sf /usr/sbin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
     fi
   '';
@@ -169,12 +172,6 @@ session    sufficient /usr/lib/security/pam_permit.so
         export TERMINFO_DIRS="''${TERMINFO_DIRS:-/lib/terminfo:/usr/share/terminfo:/usr/lib/terminfo}"
 
         mkdir -p /run /run/wrappers /run/wrappers/bin
-
-        if [ -e /usr/bin/unix_chkpwd ]; then
-          ln -sf /usr/bin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
-        elif [ -e /usr/sbin/unix_chkpwd ]; then
-          ln -sf /usr/sbin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
-        fi
 
         ${lib.optionalString debug ''
           echo
