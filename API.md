@@ -3,8 +3,8 @@
 ## Table of contents
 
 - [Function](#function)
+  - [lib.mkRunVm](#mkrunvm)
   - [mkInitrd](#mkinitrd)
-  - [mkRunVm](#mkrunvm)
   - [mkSystem](#mksystem)
   - [mkSystem](#mksystem)
 - [Helper](#helper)
@@ -23,6 +23,49 @@
   - [schema](#schema)
 
 ## Function
+
+### mkRunVm
+
+Build a QEMU VM launcher for a rootfs image and initrd.
+
+- **Path:** `lib.mkRunVm`
+- **Kind:** `function`
+- **Source:** `lib/boot/vm/mk-run-vm.nix`
+
+#### Parameters
+
+- `name` *string* — Name of the generated script.
+- `rootfsImage` *path* — Rootfs image to boot.
+- `kernelImage` *path* — Kernel image (for example ${kernel}/bzImage).
+- `initrd` *path* — Initrd image.
+- `hostSystem` *string* — Host platform.
+- `guestSystem` *string* — Guest platform.
+- `memoryMB` *int?* — VM memory in MB.
+- `cpus` *int?* — Number of virtual CPUs.
+- `graphics` *bool?* — Enable graphical output and input devices.
+- `serialConsole` *bool?* — Attach the serial console to stdio.
+- `machine` *string?* — Override the QEMU machine type.
+- `kernelParams` *list* — Extra kernel command line parameters.
+- `extraDevices` *list* — Extra QEMU -device arguments.
+- `extraQemuArgs` *list* — Raw extra QEMU arguments appended at the end.
+
+#### Returns
+
+- derivation containing the VM launcher script.
+
+#### Examples
+
+```nix
+antinixLib.mkRunVm {
+  name = "run-demo";
+  rootfsImage = demoSystem.image;
+  kernelImage = "${kernel}/bzImage";
+  initrd = demoInitrd;
+  hostSystem = system;
+  guestSystem = system;
+  graphics = false;
+}
+```
 
 ### mkInitrd
 
@@ -54,41 +97,6 @@ antinixLib.mkInitrd {
     "virtio_blk"
     "ext4"
   ];
-}
-```
-
-### mkRunVm
-
-Build a QEMU VM launcher for a rootfs image and initrd.
-
-- **Kind:** `function`
-- **Source:** `lib/boot/vm/mk-run-vm.nix`
-
-#### Parameters
-
-- `name` *string* — Name of the generated script.
-- `rootfsImage` *path* — Rootfs image to boot.
-- `kernelImage` *path* — Kernel image (e.g. ${kernel}/bzImage).
-- `initrd` *path* — Initrd image.
-- `hostSystem` *string* — Host platform.
-- `guestSystem` *string* — Guest platform.
-- `memoryMB` *int?* — VM memory in MB.
-- `cpus` *int?* — Number of virtual CPUs.
-
-#### Returns
-
-- derivation containing the VM launcher script.
-
-#### Examples
-
-```nix
-antinixLib.mkRunVm {
-  name = "run-demo";
-  rootfsImage = demoSystem.image;
-  kernelImage = "${kernel}/bzImage";
-  initrd = demoInitrd;
-  hostSystem = system;
-  guestSystem = system;
 }
 ```
 

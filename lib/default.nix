@@ -62,7 +62,7 @@ let
   };
 
   mkRunVm = pkgs.callPackage ./boot/vm/mk-run-vm.nix {
-    writeShellScriptBin = pkgs.writeShellScriptBin;
+    writeShellApplication = pkgs.writeShellApplication;
   };
 
   mkSystem = pkgs.callPackage ./system/mk-system.nix {

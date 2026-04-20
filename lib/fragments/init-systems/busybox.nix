@@ -29,6 +29,7 @@ in
       text = ''
         ::sysinit:/etc/init.d/rcS
         ${console}::respawn:/usr/bin/agetty -L ${console} 115200 vt100 -l /usr/bin/login
+        tty1::respawn:/usr/bin/agetty tty1 115200 linux -l /usr/bin/login
         ::ctrlaltdel:/bin/reboot
         ::shutdown:/bin/umount -a -r
         ::shutdown:/bin/swapoff -a

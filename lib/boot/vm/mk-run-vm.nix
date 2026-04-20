@@ -1,22 +1,25 @@
-{
-  lib,
-  pkgs,
-  writeShellScriptBin,
-}:
+{ pkgs, writeShellApplication }:
 
 ##@ name: mkRunVm
+##@ path: lib.mkRunVm
 ##@ kind: function
 ##@ summary: Build a QEMU VM launcher for a rootfs image and initrd.
 ##@ param: name string Name of the generated script.
 ##@ param: rootfsImage path Rootfs image to boot.
-##@ param: kernelImage path Kernel image (e.g. ${kernel}/bzImage).
+##@ param: kernelImage path Kernel image (for example ${kernel}/bzImage).
 ##@ param: initrd path Initrd image.
 ##@ param: hostSystem string Host platform.
 ##@ param: guestSystem string Guest platform.
 ##@ param: memoryMB int? VM memory in MB.
 ##@ param: cpus int? Number of virtual CPUs.
+##@ param: graphics bool? Enable graphical output and input devices.
+##@ param: serialConsole bool? Attach the serial console to stdio.
+##@ param: machine string? Override the QEMU machine type.
+##@ param: kernelParams list Extra kernel command line parameters.
+##@ param: extraDevices list Extra QEMU -device arguments.
+##@ param: extraQemuArgs list Raw extra QEMU arguments appended at the end.
 ##@ returns: derivation containing the VM launcher script.
-##@ example: antinixLib.mkRunVm { name = "run-demo"; rootfsImage = demoSystem.image; kernelImage = "${kernel}/bzImage"; initrd = demoInitrd; hostSystem = system; guestSystem = system; }
+##@ example: antinixLib.mkRunVm { name = "run-demo"; rootfsImage = demoSystem.image; kernelImage = "${kernel}/bzImage"; initrd = demoInitrd; hostSystem = system; guestSystem = system; graphics = false; }
 
 {
   name,
@@ -25,41 +28,53 @@
   initrd,
   hostSystem,
   guestSystem,
+
   memoryMB ? 1024,
   cpus ? 2,
-  reuseCachedImage ? false,
-  cacheDirName ? "antinix-vm",
+
+  graphics ? true,
+  serialConsole ? true,
+  machine ? null,
+
   kernelParams ? [ ],
+  extraDevices ? [ ],
   extraQemuArgs ? [ ],
-  display ? "gtk",
-  net ? true,
 }:
 
 let
-  guestIsX86 = guestSystem == "x86_64-linux";
-  guestIsAarch64 = guestSystem == "aarch64-linux";
+  lib = pkgs.lib;
 
-  guestConsole =
-    if guestIsX86 then
-      "ttyS0"
-    else if guestIsAarch64 then
-      "ttyAMA0"
+  qemuPkg =
+    if guestSystem == "x86_64-linux" then
+      pkgs.qemu
+    else if guestSystem == "aarch64-linux" then
+      pkgs.qemu
     else
-      throw "mk-run-vm.nix: unsupported guest system `${guestSystem}`";
+      throw "mkRunVm: unsupported guestSystem ${guestSystem}";
 
   qemuBinary =
-    if guestIsX86 then
-      "${pkgs.qemu}/bin/qemu-system-x86_64"
-    else if guestIsAarch64 then
-      "${pkgs.qemu}/bin/qemu-system-aarch64"
+    if guestSystem == "x86_64-linux" then
+      "${qemuPkg}/bin/qemu-system-x86_64"
+    else if guestSystem == "aarch64-linux" then
+      "${qemuPkg}/bin/qemu-system-aarch64"
     else
-      throw "mk-run-vm.nix: unsupported guest system `${guestSystem}`";
+      throw "mkRunVm: unsupported guestSystem ${guestSystem}";
 
-  defaultKernelParams =
-    if guestIsX86 then
+  defaultMachine =
+    if guestSystem == "x86_64-linux" then
+      "pc"
+    else if guestSystem == "aarch64-linux" then
+      "virt"
+    else
+      throw "mkRunVm: unsupported guestSystem ${guestSystem}";
+
+  effectiveMachine = if machine != null then machine else defaultMachine;
+
+  baseKernelParams =
+    if guestSystem == "x86_64-linux" then
       [
         "console=tty0"
-        "console=${guestConsole}"
+        "console=ttyS0"
         "root=/dev/vda"
         "rootfstype=ext4"
         "rw"
@@ -67,13 +82,12 @@ let
         "rd.driver.pre=virtio_pci"
         "rd.driver.pre=virtio_blk"
         "rd.driver.pre=ext4"
-      ]
-      ++ lib.optionals net [
         "rd.driver.pre=virtio_net"
+        "init=/init"
       ]
-    else if guestIsAarch64 then
+    else if guestSystem == "aarch64-linux" then
       [
-        "console=${guestConsole}"
+        "console=ttyAMA0"
         "root=/dev/vda"
         "rootfstype=ext4"
         "rw"
@@ -81,124 +95,110 @@ let
         "rd.driver.pre=virtio_pci"
         "rd.driver.pre=virtio_blk"
         "rd.driver.pre=ext4"
-      ]
-      ++ lib.optionals net [
         "rd.driver.pre=virtio_net"
+        "init=/init"
+      ]
+    else
+      throw "mkRunVm: unsupported guestSystem ${guestSystem}";
+
+  effectiveKernelParams = baseKernelParams ++ kernelParams;
+  kernelAppend = lib.concatStringsSep " " effectiveKernelParams;
+
+graphicsArgs =
+  if graphics then
+    if guestSystem == "x86_64-linux" then
+      [
+        "-display" "gtk"
+        "-device" "virtio-gpu-pci"
+      ]
+    else if guestSystem == "aarch64-linux" then
+      [
+        "-display" "gtk"
+        "-device" "virtio-gpu-pci"
+        "-device" "qemu-xhci"
+        "-device" "usb-kbd"
+        "-device" "usb-mouse"
+      ]
+    else
+      [ ]
+  else
+    [
+      "-display" "none"
+    ];
+
+  serialArgs =
+    if serialConsole then
+      [
+        "-serial" "stdio"
+        "-monitor" "none"
       ]
     else
       [ ];
 
-  appendLine = lib.concatStringsSep " " (defaultKernelParams ++ kernelParams);
+  archArgs =
+    if guestSystem == "x86_64-linux" then
+      [
+        "-machine" effectiveMachine
+        "-drive" "file=$IMAGE,format=raw,if=none,id=drv0"
+        "-device" "virtio-blk-pci,drive=drv0,id=virtio0"
+        "-nic" "user,model=virtio-net-pci"
+      ]
+    else if guestSystem == "aarch64-linux" then
+      [
+        "-machine" effectiveMachine
+        "-cpu" "cortex-a72"
+        "-device" "virtio-rng-pci"
+        "-drive" "file=$IMAGE,format=raw,if=none,id=vdisk"
+        "-device" "virtio-blk-device,drive=vdisk"
+        "-nic" "user,model=virtio-net-pci"
+      ]
+    else
+      throw "mkRunVm: unsupported guestSystem ${guestSystem}";
 
-  baseArgs = [
-    "-m"
-    (toString memoryMB)
-    "-smp"
-    (toString cpus)
-    "-kernel"
-    (toString kernelImage)
-    "-initrd"
-    (toString initrd)
-    "-append"
-    appendLine
-  ];
+  renderedExtraDevices = lib.concatMap (dev: [ "-device" dev ]) extraDevices;
 
-  x86Args = [
-    "-machine"
-    "pc"
-    "-display"
-    display
-    "-serial"
-    "stdio"
-    "-monitor"
-    "none"
-    "-device"
-    "virtio-gpu-pci"
-    "-device"
-    "qemu-xhci"
-    "-device"
-    "usb-kbd"
-    "-device"
-    "usb-mouse"
-  ]
-  ++ lib.optionals net [
-    "-nic"
-    "user,model=virtio-net-pci"
-  ];
-
-  aarch64Args = [
-    "-M"
-    "virt"
-    "-cpu"
-    "cortex-a72"
-    "-device"
-    "virtio-rng-pci"
-    "-serial"
-    "stdio"
-    "-monitor"
-    "none"
-  ]
-  ++ lib.optionals net [
-    "-nic"
-    "user,model=virtio-net-pci"
-  ];
-
-  qemuArgs =
-    baseArgs
-    ++ (
-      if guestIsX86 then
-        x86Args
-      else if guestIsAarch64 then
-        aarch64Args
-      else
-        [ ]
-    )
+  renderedArgs =
+    graphicsArgs
+    ++ serialArgs
+    ++ archArgs
+    ++ renderedExtraDevices
     ++ extraQemuArgs;
 
-  renderArg = arg: "    ${lib.escapeShellArg arg}";
-  argsBlock = lib.concatStringsSep "\n" (map renderArg qemuArgs);
-
 in
-writeShellScriptBin name ''
+writeShellApplication {
+  inherit name;
+
+  runtimeInputs = [
+    pkgs.bash
+    pkgs.coreutils
+    qemuPkg
+  ];
+
+  text = ''
     set -euo pipefail
 
     echo "hostSystem=${hostSystem}"
     echo "guestSystem=${guestSystem}"
 
-    WORKDIR="''${XDG_CACHE_HOME:-$HOME/.cache}/${cacheDirName}"
+    WORKDIR="''${XDG_CACHE_HOME:-$HOME/.cache}/antinix-vm"
     mkdir -p "$WORKDIR"
 
     IMAGE="$WORKDIR/${name}.img"
-
-    if ${if reuseCachedImage then "true" else "false"}; then
-      if [ ! -e "$IMAGE" ]; then
-        echo "No existing writable image at: $IMAGE" >&2
-        echo "Run the fresh-image launcher once first or create it manually." >&2
-        exit 1
-      fi
-    else
-      cp -f "${rootfsImage}" "$IMAGE"
-      chmod u+w "$IMAGE"
-    fi
+    cp -f "${rootfsImage}" "$IMAGE"
+    chmod u+w "$IMAGE"
 
     args=(
-  ${argsBlock}
+      -m ${toString memoryMB}
+      -smp ${toString cpus}
+      -kernel "${kernelImage}"
+      -initrd "${initrd}"
+      -append '${kernelAppend}'
+      ${lib.concatStringsSep "\n      " (map (arg: "\"${arg}\"") renderedArgs)}
     )
-
-    if [ "${guestSystem}" = "x86_64-linux" ]; then
-      args+=(
-        "-drive" "file=$IMAGE,format=raw,if=none,id=drv0"
-        "-device" "virtio-blk-pci,drive=drv0,id=virtio0"
-      )
-    elif [ "${guestSystem}" = "aarch64-linux" ]; then
-      args+=(
-        "-drive" "file=$IMAGE,format=raw,if=none,id=vdisk"
-        "-device" "virtio-blk-device,drive=vdisk"
-      )
-    fi
 
     printf 'QEMU CMD: %q ' "${qemuBinary}" "''${args[@]}"
     printf '\n'
 
     exec "${qemuBinary}" "''${args[@]}"
-''
+  '';
+}

@@ -22,7 +22,7 @@ antinix.mkSystem {
       shell = "/bin/sh";
       createHome = true;
       description = "root";
-      hashedPassword = "$6$wP4WOkSH2cPLBH8w$jhyzYxkm5JHpO5x6vz8L5bbPXGLDAvixvJCSgq/YUlHPbIRPSHg45s3BlIk81prVwYp92sEpFuVh73oWt..jo0";
+      hashedPassword = "$6$7sEurbxdIdmGqg7/$oTHc9zUEJglFRhzK05SIIN4C61j2ooznGPGRqlaSoxDFdAz5CqYvBK2F9balNlgLEjYtYPovvL8drLAGMHkda1";
     };
   };
 

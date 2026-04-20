@@ -69,10 +69,56 @@
           );
 
           guestCfg = guestConfigFor pkgs.system;
-          kernelPkg = pkgs.linuxPackages.kernel;
-          kernelVersion = kernelPkg.modDirVersion or kernelPkg.version;
-          moduleTree = kernelPkg.modules;
-          kernelImage = "${kernelPkg}/${guestCfg.kernelPath}";
+
+          kernelSystem = nixpkgs.lib.nixosSystem {
+            system = pkgs.system;
+            modules = [
+              (
+                { modulesPath, ... }:
+                {
+                  imports = [
+                    "${modulesPath}/profiles/qemu-guest.nix"
+                  ];
+
+                  boot.loader.grub.enable = false;
+                  boot.supportedFilesystems = [ "ext4" ];
+
+                  boot.initrd.availableKernelModules = [
+                    "virtio_blk"
+                    "virtio_pci"
+                    "virtio_mmio"
+                    "virtio_scsi"
+                    "virtio_net"
+                    "ext4"
+                    "sd_mod"
+                    "ahci"
+
+                    "virtio_gpu"
+                    "drm"
+                    "drm_kms_helper"
+
+                    "xhci_pci"
+                    "xhci_hcd"
+                    "usbkbd"
+                    "usbhid"
+                    "hid"
+                    "hid_generic"
+
+                    "i8042"
+                    "serio_raw"
+                    "atkbd"
+                    "psmouse"
+                    "evdev"
+                  ];
+
+                  system.stateVersion = "25.11";
+                }
+              )
+            ];
+          };
+
+          kernel = kernelSystem.config.system.build.kernel;
+          kernelImage = "${kernel}/${guestCfg.kernelPath}";
 
           mkVariant =
             {
@@ -87,6 +133,8 @@
               buildTarball = true;
               buildImage = true;
 
+              nixosSystem = kernelSystem;
+
               users = {
                 root = antinix.schema.mkUser {
                   isNormalUser = false;
@@ -96,7 +144,7 @@
                   shell = "/bin/sh";
                   createHome = true;
                   description = "root";
-                  hashedPassword = "<your test hash>";
+                  hashedPassword = "$6$e/2f7MUQ8v40XgO8$bCqV0pLnSYDSm1NIFDNpvDdpvaSYdS.6k3C4iOfovv2IzsoMHdtG6VrHtXrItS9sqhFQGP7efrPp3/JMYK/90/";
                 };
               };
 
@@ -123,12 +171,23 @@
 
               initrd = antinix.mkInitrd {
                 name = "${variantName}-initrd.img";
-                inherit kernelVersion moduleTree;
+                nixosSystem = kernelSystem;
                 extraDrivers = [
                   "virtio_pci"
                   "virtio_blk"
                   "ext4"
                   "virtio_net"
+                  "virtio_gpu"
+                  "drm"
+                  "drm_kms_helper"
+                  "xhci_pci"
+                  "xhci_hcd"
+                  "usbhid"
+                  "hid_generic"
+                  "i8042"
+                  "atkbd"
+                  "psmouse"
+                  "evdev"
                 ];
               };
 
@@ -178,7 +237,6 @@
               }
             ]
             ++ variantPackages;
-
         in
         builtins.listToAttrs allPackages
       );
@@ -209,39 +267,41 @@
                 program = "${vm}/bin/run-vm-${variantName}";
               };
             };
-
         in
-        builtins.listToAttrs (lib.concatMap (init: map (pm: mkApp init pm) packageManagerNames) initNames)
+        builtins.listToAttrs (
+          lib.concatMap (init: map (pm: mkApp init pm) packageManagerNames) initNames
+        )
       );
 
       formatter = forAllSystems (pkgs: pkgs.nixfmt-rfc-style);
-devShells = forAllSystems (
-  pkgs:
-  let
-    leftHookBin = "${pkgs.lefthook}/bin/lefthook";
-  in
-  {
-    default = pkgs.mkShell {
-      packages = with pkgs; [
-        rustc
-        cargo
-        rustfmt
-        clippy
-        rust-analyzer
-        go
-        lefthook
-        git
-      ];
 
-      shellHook = ''
-        export PATH="$PWD/node_modules/.bin:$PATH"
+      devShells = forAllSystems (
+        pkgs:
+        let
+          leftHookBin = "${pkgs.lefthook}/bin/lefthook";
+        in
+        {
+          default = pkgs.mkShell {
+            packages = with pkgs; [
+              rustc
+              cargo
+              rustfmt
+              clippy
+              rust-analyzer
+              go
+              lefthook
+              git
+            ];
 
-        if [ -d .git ]; then
-          ${leftHookBin} install
-        fi
-      '';
-    };
-  }
-);
+            shellHook = ''
+              export PATH="$PWD/node_modules/.bin:$PATH"
+
+              if [ -d .git ]; then
+                ${leftHookBin} install
+              fi
+            '';
+          };
+        }
+      );
     };
 }
