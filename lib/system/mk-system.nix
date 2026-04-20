@@ -138,6 +138,22 @@ let
     else
       { };
 
+  kernelAllowedStorePrefixes =
+    if effectiveModulesTree != null then
+      [ (toString effectiveModulesTree) ]
+    else
+      [ ];
+
+  effectivePatching =
+    patching
+    // {
+      allowedStorePrefixes =
+        lib.unique (
+          kernelAllowedStorePrefixes
+          ++ (patching.allowedStorePrefixes or [ ])
+        );
+    };
+
   isCallableFragment =
     fragment:
     builtins.isFunction fragment || (builtins.isAttrs fragment && fragment ? __functor);
@@ -182,11 +198,11 @@ let
       services
       runtime
       postBuild
-      patching
       validation
       meta
       ;
     imports = kernelImports // imports;
+    patching = effectivePatching;
   };
 
   mergedFragment =
