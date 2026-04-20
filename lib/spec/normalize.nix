@@ -169,7 +169,6 @@ in
     hostname
     packages
     symlinks
-    imports
     services
     runtime
     postBuild
@@ -178,6 +177,8 @@ in
     meta
     ;
 
+
+  imports = fragment.imports or { };
   files = normalizedFiles;
   directories = normalizedDirectories;
   users = normalizedUsers;

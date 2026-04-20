@@ -157,6 +157,11 @@ let
     else
       { };
 
+  _traceKernelImports =
+    builtins.trace
+      "mkSystem kernelImports=${builtins.toJSON kernelImports}"
+      null;
+
   kernelAllowedStorePrefixes = lib.unique (
     lib.optional (effectiveModulesTree != null) (toString effectiveModulesTree)
     ++ lib.optional (effectiveKernel != null) (toString effectiveKernel)
@@ -195,7 +200,11 @@ let
   initFragment = realizeFragment (getInitFragment init);
   packageManagerFragment = realizeFragment (getPackageManagerFragment packageManager);
 
-  userBaseFragment = baseFragmentFromArgs {
+  userBaseFragment =
+    let
+      _ = _traceKernelImports;
+    in
+    baseFragmentFromArgs {
     inherit
       name
       hostname
