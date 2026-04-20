@@ -16,6 +16,7 @@
 ##@ param: memoryMB int? VM memory in MB.
 ##@ param: cpus int? Number of virtual CPUs.
 ##@ returns: derivation containing the VM launcher script.
+##@ example: antinixLib.mkRunVm { name = "run-demo"; rootfsImage = demoSystem.image; kernelImage = "${kernel}/bzImage"; initrd = demoInitrd; hostSystem = system; guestSystem = system; }
 
 {
   name,

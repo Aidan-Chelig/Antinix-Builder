@@ -1,110 +1,37 @@
 # Antinix API Reference
 
-## antinixLib
+## Table of contents
 
-Top-level Antinix library exposing system builders and helpers.
+- [Function](#function)
+  - [mkInitrd](#mkinitrd)
+  - [mkRunVm](#mkrunvm)
+  - [mkSystem](#mksystem)
+  - [mkSystem](#mksystem)
+- [Helper](#helper)
+  - [mkDirectory](#mkdirectory)
+  - [mkFile](#mkfile)
+  - [mkGroup](#mkgroup)
+  - [mkImport](#mkimport)
+  - [mkUser](#mkuser)
+- [Registry](#registry)
+  - [initSystems](#initsystems)
+  - [initSystems](#initsystems)
+  - [packageManagers](#packagemanagers)
+  - [packageManagers](#packagemanagers)
+- [Module](#module)
+  - [antinixLib](#antinixlib)
+  - [schema](#schema)
 
-- **Kind:** `module`
-- **Source:** `lib/default.nix`
+## Function
 
-### Returns
-
-- attrset containing mkSystem, mkInitrd, mkRunVm, schema, and utilities.
-
-## initSystems
-
-Available init system fragments keyed by name.
-
-- **Kind:** `registry`
-- **Source:** `lib/default.nix`
-
-### Returns
-
-- attrset mapping init system names to fragment builders.
-
-## initSystems
-
-Available init systems.
-
-- **Kind:** `registry`
-- **Source:** `lib/default.nix`
-
-## mkDirectory
-
-Define a directory in the rootfs.
-
-- **Kind:** `helper`
-- **Source:** `lib/fragments/schema.nix`
-
-### Parameters
-
-- `mode` *string?* — Directory mode.
-- `user` *string* — Owner user.
-- `group` *string* — Owner group.
-
-### Returns
-
-- attrset describing a directory.
-
-## mkFile
-
-Define a file in the rootfs.
-
-- **Kind:** `helper`
-- **Source:** `lib/fragments/schema.nix`
-
-### Parameters
-
-- `source` *path?* — Source file to copy.
-- `text` *string?* — Inline file contents.
-- `mode` *string?* — File mode (e.g. "0644").
-- `user` *string* — Owner user.
-- `group` *string* — Owner group.
-
-### Returns
-
-- attrset describing a file entry.
-
-## mkGroup
-
-Define a system group.
-
-- **Kind:** `helper`
-- **Source:** `lib/fragments/schema.nix`
-
-### Parameters
-
-- `gid` *int?* — Group ID.
-
-### Returns
-
-- attrset describing a group.
-
-## mkImport
-
-Import an existing filesystem tree into the rootfs.
-
-- **Kind:** `helper`
-- **Source:** `lib/fragments/schema.nix`
-
-### Parameters
-
-- `source` *path* — Source directory to copy.
-- `user` *string* — Owner user.
-- `group` *string* — Owner group.
-
-### Returns
-
-- attrset describing an import.
-
-## mkInitrd
+### mkInitrd
 
 Build a dracut initrd for a kernel or nixosSystem.
 
 - **Kind:** `function`
 - **Source:** `lib/boot/dracut/mk-initrd.nix`
 
-### Parameters
+#### Parameters
 
 - `name` *string?* — Initrd output filename.
 - `nixosSystem` *attrset?* — Optional nixosSystem used to derive kernel and modules.
@@ -113,11 +40,11 @@ Build a dracut initrd for a kernel or nixosSystem.
 - `kernelVersion` *string?* — Optional explicit kernel version override.
 - `extraDrivers` *list* — Additional kernel drivers to include.
 
-### Returns
+#### Returns
 
 - derivation producing an initrd image.
 
-### Examples
+#### Examples
 
 ```nix
 antinixLib.mkInitrd {
@@ -130,14 +57,14 @@ antinixLib.mkInitrd {
 }
 ```
 
-## mkRunVm
+### mkRunVm
 
 Build a QEMU VM launcher for a rootfs image and initrd.
 
 - **Kind:** `function`
 - **Source:** `lib/boot/vm/mk-run-vm.nix`
 
-### Parameters
+#### Parameters
 
 - `name` *string* — Name of the generated script.
 - `rootfsImage` *path* — Rootfs image to boot.
@@ -148,25 +75,38 @@ Build a QEMU VM launcher for a rootfs image and initrd.
 - `memoryMB` *int?* — VM memory in MB.
 - `cpus` *int?* — Number of virtual CPUs.
 
-### Returns
+#### Returns
 
 - derivation containing the VM launcher script.
 
-## mkSystem
+#### Examples
+
+```nix
+antinixLib.mkRunVm {
+  name = "run-demo";
+  rootfsImage = demoSystem.image;
+  kernelImage = "${kernel}/bzImage";
+  initrd = demoInitrd;
+  hostSystem = system;
+  guestSystem = system;
+}
+```
+
+### mkSystem
 
 Entry point for building Antinix systems.
 
 - **Kind:** `function`
 - **Source:** `lib/default.nix`
 
-## mkSystem
+### mkSystem
 
 Build a system spec and rootfs artifacts.
 
 - **Kind:** `function`
 - **Source:** `lib/system/mk-system.nix`
 
-### Parameters
+#### Parameters
 
 - `name` *string?* — System name used for artifact naming.
 - `hostname` *string?* — Hostname written into the rootfs.
@@ -179,11 +119,11 @@ Build a system spec and rootfs artifacts.
 - `buildTarball` *bool?* — Build a tarball artifact.
 - `buildImage` *bool?* — Build an image artifact.
 
-### Returns
+#### Returns
 
 - attrset containing config, normalizedSpec, rootfs, tarball, image, and meta.
 
-### Examples
+#### Examples
 
 ```nix
 antinixLib.mkSystem {
@@ -195,14 +135,84 @@ antinixLib.mkSystem {
 }
 ```
 
-## mkUser
+## Helper
+
+### mkDirectory
+
+Define a directory in the rootfs.
+
+- **Kind:** `helper`
+- **Source:** `lib/fragments/schema.nix`
+
+#### Parameters
+
+- `mode` *string?* — Directory mode.
+- `user` *string* — Owner user.
+- `group` *string* — Owner group.
+
+#### Returns
+
+- attrset describing a directory.
+
+### mkFile
+
+Define a file in the rootfs.
+
+- **Kind:** `helper`
+- **Source:** `lib/fragments/schema.nix`
+
+#### Parameters
+
+- `source` *path?* — Source file to copy.
+- `text` *string?* — Inline file contents.
+- `mode` *string?* — File mode (e.g. "0644").
+- `user` *string* — Owner user.
+- `group` *string* — Owner group.
+
+#### Returns
+
+- attrset describing a file entry.
+
+### mkGroup
+
+Define a system group.
+
+- **Kind:** `helper`
+- **Source:** `lib/fragments/schema.nix`
+
+#### Parameters
+
+- `gid` *int?* — Group ID.
+
+#### Returns
+
+- attrset describing a group.
+
+### mkImport
+
+Import an existing filesystem tree into the rootfs.
+
+- **Kind:** `helper`
+- **Source:** `lib/fragments/schema.nix`
+
+#### Parameters
+
+- `source` *path* — Source directory to copy.
+- `user` *string* — Owner user.
+- `group` *string* — Owner group.
+
+#### Returns
+
+- attrset describing an import.
+
+### mkUser
 
 Define a system user.
 
 - **Kind:** `helper`
 - **Source:** `lib/fragments/schema.nix`
 
-### Parameters
+#### Parameters
 
 - `uid` *int?* — User ID.
 - `group` *string?* — Primary group.
@@ -212,35 +222,68 @@ Define a system user.
 - `hashedPassword` *string* — Pre-hashed password.
 - `isNormalUser` *bool* — Whether user is a normal account.
 
-### Returns
+#### Returns
 
 - attrset describing a user.
 
-## packageManagers
+## Registry
+
+### initSystems
+
+Available init system fragments keyed by name.
+
+- **Kind:** `registry`
+- **Source:** `lib/default.nix`
+
+#### Returns
+
+- attrset mapping init system names to fragment builders.
+
+### initSystems
+
+Available init systems.
+
+- **Kind:** `registry`
+- **Source:** `lib/default.nix`
+
+### packageManagers
 
 Available package manager fragments keyed by name.
 
 - **Kind:** `registry`
 - **Source:** `lib/default.nix`
 
-### Returns
+#### Returns
 
 - attrset mapping package manager names to fragment builders.
 
-## packageManagers
+### packageManagers
 
 Available package managers.
 
 - **Kind:** `registry`
 - **Source:** `lib/default.nix`
 
-## schema
+## Module
+
+### antinixLib
+
+Top-level Antinix library exposing system builders and helpers.
+
+- **Kind:** `module`
+- **Source:** `lib/default.nix`
+
+#### Returns
+
+- attrset containing mkSystem, mkInitrd, mkRunVm, schema, and utilities.
+
+### schema
 
 Consumer-facing schema helpers.
 
 - **Kind:** `module`
 - **Source:** `lib/default.nix`
 
-### Returns
+#### Returns
 
 - attrset exposing mkFile, mkDirectory, mkImport, mkUser, mkGroup.

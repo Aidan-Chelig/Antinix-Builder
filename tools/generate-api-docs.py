@@ -6,14 +6,16 @@ import argparse
 import pathlib
 import subprocess
 import tempfile
+from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import List
+from typing import DefaultDict, List
 
 
 @dataclass
 class Entry:
     source: str
     name: str = ""
+    path: str = ""
     kind: str = ""
     summary: str = ""
     params: List[str] = field(default_factory=list)
@@ -31,6 +33,7 @@ def parse_file(path: pathlib.Path, display_source: str) -> List[Entry]:
     for raw_line in path.read_text(encoding="utf-8").splitlines():
         line = raw_line.rstrip("\n")
         stripped = line.lstrip()
+
         if stripped.startswith("##@"):
             current.append(stripped[3:].strip())
             continue
@@ -61,6 +64,8 @@ def build_entry(display_source: str, lines: List[str]) -> Entry:
 
         if key == "name":
             entry.name = value
+        elif key == "path":
+            entry.path = value
         elif key == "kind":
             entry.kind = value
         elif key == "summary":
@@ -104,58 +109,107 @@ def format_nix(code: str, nixfmt: str | None) -> str:
                 pass
 
 
+def slugify(text: str) -> str:
+    slug = text.strip().lower()
+    out: List[str] = []
+    last_dash = False
+
+    for ch in slug:
+        if ch.isalnum():
+            out.append(ch)
+            last_dash = False
+        else:
+            if not last_dash:
+                out.append("-")
+                last_dash = True
+
+    return "".join(out).strip("-")
+
+
+def render_entry(entry: Entry, nixfmt: str | None) -> List[str]:
+    out: List[str] = []
+
+    out.append(f"### {entry.name}")
+    out.append("")
+    if entry.summary:
+        out.append(entry.summary)
+        out.append("")
+
+    if entry.path:
+        out.append(f"- **Path:** `{entry.path}`")
+    out.append(f"- **Kind:** `{entry.kind or 'unknown'}`")
+    out.append(f"- **Source:** `{entry.source}`")
+    out.append("")
+
+    if entry.params:
+        out.append("#### Parameters")
+        out.append("")
+        for param in entry.params:
+            parts = param.split(" ", 2)
+            if len(parts) == 1:
+                name, typ, desc = parts[0], "", ""
+            elif len(parts) == 2:
+                name, typ, desc = parts[0], parts[1], ""
+            else:
+                name, typ, desc = parts
+            if typ:
+                out.append(f"- `{name}` *{typ}* — {desc}")
+            else:
+                out.append(f"- `{name}` — {desc}")
+        out.append("")
+
+    if entry.returns:
+        out.append("#### Returns")
+        out.append("")
+        for ret in entry.returns:
+            out.append(f"- {ret}")
+        out.append("")
+
+    if entry.examples:
+        out.append("#### Examples")
+        out.append("")
+        for example in entry.examples:
+            formatted = format_nix(example, nixfmt)
+            out.append("```nix")
+            out.append(formatted)
+            out.append("```")
+            out.append("")
+
+    return out
+
+
 def render(entries: List[Entry], title: str, nixfmt: str | None) -> str:
+    grouped: DefaultDict[str, List[Entry]] = defaultdict(list)
+    for entry in entries:
+        grouped[entry.kind or "unknown"].append(entry)
+
+    kind_order = ["function", "helper", "registry", "module", "unknown"]
+    present_kinds = [k for k in kind_order if k in grouped]
+    remaining_kinds = sorted(k for k in grouped.keys() if k not in kind_order)
+    all_kinds = present_kinds + remaining_kinds
+
     out: List[str] = []
     out.append(f"# {title}")
     out.append("")
 
-    for entry in entries:
-        out.append(f"## {entry.name}")
+    out.append("## Table of contents")
+    out.append("")
+    for kind in all_kinds:
+        kind_title = kind.capitalize()
+        out.append(f"- [{kind_title}](#{slugify(kind_title)})")
+        for entry in sorted(grouped[kind], key=lambda e: (e.path or e.name).lower()):
+            toc_label = entry.path if entry.path else entry.name
+            out.append(f"  - [{toc_label}](#{slugify(entry.name)})")
+    out.append("")
+
+    for kind in all_kinds:
+        kind_title = kind.capitalize()
+        out.append(f"## {kind_title}")
         out.append("")
-        if entry.summary:
-            out.append(entry.summary)
-            out.append("")
-
-        out.append(f"- **Kind:** `{entry.kind or 'unknown'}`")
-        out.append(f"- **Source:** `{entry.source}`")
-        out.append("")
-
-        if entry.params:
-            out.append("### Parameters")
-            out.append("")
-            for param in entry.params:
-                parts = param.split(" ", 2)
-                if len(parts) == 1:
-                    name, typ, desc = parts[0], "", ""
-                elif len(parts) == 2:
-                    name, typ, desc = parts[0], parts[1], ""
-                else:
-                    name, typ, desc = parts
-                if typ:
-                    out.append(f"- `{name}` *{typ}* — {desc}")
-                else:
-                    out.append(f"- `{name}` — {desc}")
-            out.append("")
-
-        if entry.returns:
-            out.append("### Returns")
-            out.append("")
-            for ret in entry.returns:
-                out.append(f"- {ret}")
-            out.append("")
-
-        if entry.examples:
-            out.append("### Examples")
-            out.append("")
-            for example in entry.examples:
-                formatted = format_nix(example, nixfmt)
-                out.append("```nix")
-                out.append(formatted)
-                out.append("```")
-                out.append("")
+        for entry in sorted(grouped[kind], key=lambda e: (e.path or e.name).lower()):
+            out.extend(render_entry(entry, nixfmt))
 
     return "\n".join(out).rstrip() + "\n"
-
 
 
 def main() -> None:
@@ -173,8 +227,6 @@ def main() -> None:
 
     if not entries:
         raise RuntimeError("No API doc entries found. Did you forget ##@ comments?")
-
-    entries.sort(key=lambda e: e.name.lower())
 
     output = render(entries, args.title, args.nixfmt)
     pathlib.Path(args.output).write_text(output, encoding="utf-8")
