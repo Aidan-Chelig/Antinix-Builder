@@ -11,7 +11,17 @@ let
     inherit schema;
   };
 
+##@ name: initSystems
+##@ kind: registry
+##@ summary: Available init system fragments keyed by name.
+##@ returns: attrset mapping init system names to fragment builders.
+
   initSystems = pkgs.callPackage ./fragments/init-systems/default.nix { };
+
+##@ name: packageManagers
+##@ kind: registry
+##@ summary: Available package manager fragments keyed by name.
+##@ returns: attrset mapping package manager names to fragment builders.
 
   packageManagers = pkgs.callPackage ./fragments/package-managers/default.nix { };
 
@@ -75,11 +85,8 @@ let
 in
 {
   inherit
-    schema
     merge
     normalize
-    initSystems
-    packageManagers
     accounts
     overlay
     patcherConfig
@@ -91,6 +98,30 @@ in
     mkRootfsTarball
     mkRootfsImage
     mkRunVm
-    mkSystem
     ;
+
+  ##@ name: schema
+  ##@ kind: module
+  ##@ summary: Consumer-facing schema helpers.
+  ##@ returns: attrset exposing mkFile, mkDirectory, mkImport, mkUser, mkGroup.
+  schema = schema;
+
+  ##@ name: initSystems
+  ##@ kind: registry
+  ##@ summary: Available init systems.
+  initSystems = initSystems;
+
+  ##@ name: packageManagers
+  ##@ kind: registry
+  ##@ summary: Available package managers.
+  packageManagers = packageManagers;
+
+  ##@ name: mkSystem
+  ##@ kind: function
+  ##@ summary: Entry point for building Antinix systems.
+  mkSystem = mkSystem ;
+
+
+
+
 }

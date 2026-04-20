@@ -11,6 +11,24 @@ Top-level Antinix library exposing system builders and helpers.
 
 - attrset containing mkSystem, mkInitrd, mkRunVm, schema, and utilities.
 
+## initSystems
+
+Available init system fragments keyed by name.
+
+- **Kind:** `registry`
+- **Source:** `lib/default.nix`
+
+### Returns
+
+- attrset mapping init system names to fragment builders.
+
+## initSystems
+
+Available init systems.
+
+- **Kind:** `registry`
+- **Source:** `lib/default.nix`
+
 ## mkDirectory
 
 Define a directory in the rootfs.
@@ -136,6 +154,13 @@ Build a QEMU VM launcher for a rootfs image and initrd.
 
 ## mkSystem
 
+Entry point for building Antinix systems.
+
+- **Kind:** `function`
+- **Source:** `lib/default.nix`
+
+## mkSystem
+
 Build a system spec and rootfs artifacts.
 
 - **Kind:** `function`
@@ -190,3 +215,32 @@ Define a system user.
 ### Returns
 
 - attrset describing a user.
+
+## packageManagers
+
+Available package manager fragments keyed by name.
+
+- **Kind:** `registry`
+- **Source:** `lib/default.nix`
+
+### Returns
+
+- attrset mapping package manager names to fragment builders.
+
+## packageManagers
+
+Available package managers.
+
+- **Kind:** `registry`
+- **Source:** `lib/default.nix`
+
+## schema
+
+Consumer-facing schema helpers.
+
+- **Kind:** `module`
+- **Source:** `lib/default.nix`
+
+### Returns
+
+- attrset exposing mkFile, mkDirectory, mkImport, mkUser, mkGroup.
