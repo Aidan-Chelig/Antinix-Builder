@@ -59,12 +59,22 @@ pub fn resolve_and_import_public_entrypoints(
     root: &Path,
     artifact_index: &ArtifactIndex,
     log: &Arc<RewriteLog>,
+    emit_debug_artifacts: bool,
 ) -> Result<()> {
-    entrypoints::resolve_and_import_public_entrypoints(root, artifact_index, log)
+    entrypoints::resolve_and_import_public_entrypoints(
+        root,
+        artifact_index,
+        log,
+        emit_debug_artifacts,
+    )
 }
 
-pub fn apply_runtime_wrappers(root: &Path, log: &Arc<RewriteLog>) -> Result<()> {
-    plans::apply_runtime_wrappers(root, log)
+pub fn apply_runtime_wrappers(
+    root: &Path,
+    log: &Arc<RewriteLog>,
+    emit_debug_artifacts: bool,
+) -> Result<()> {
+    plans::apply_runtime_wrappers(root, log, emit_debug_artifacts)
 }
 
 pub fn detect_runtime_plan(root: &Path) -> Result<RuntimePlan> {

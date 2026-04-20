@@ -76,7 +76,9 @@ fn rewrite_embedded_store_paths_one(root: &Path, path: &Path, log: &Arc<RewriteL
             rewrite_embedded_store_paths_elf(root, path, input, &finder, &ranges)
         }
         _ => match classify_bytes(&input) {
-            FileKind::Binary => rewrite_embedded_store_paths_binary(root, path, input, &finder, log),
+            FileKind::Binary => {
+                rewrite_embedded_store_paths_binary(root, path, input, &finder, log)
+            }
             FileKind::Text => rewrite_embedded_store_paths_text(root, path, input, &finder),
         },
     }

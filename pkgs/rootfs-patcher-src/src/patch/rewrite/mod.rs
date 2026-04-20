@@ -8,7 +8,7 @@ use crate::model::{BinaryRewriteRule, CompiledConfig, FileKind, RootIndex, Targe
 use crate::paths::combined_roots;
 use crate::runtime_layout::normalize_runtime_layout;
 use crate::scan::{classify_bytes, is_elf};
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use memchr::memmem;
 use patchelf::PatchElf;
 use rayon::prelude::*;
@@ -25,7 +25,8 @@ use self::reports::{
 
 pub fn process_root(root: &Path, cfg: &CompiledConfig) -> Result<()> {
     let log = std::sync::Arc::new(crate::model::RewriteLog::default());
-    normalize_runtime_layout(root, cfg).context("runtime layout normalization failed")?;
+    normalize_runtime_layout(root, cfg, &log).context("runtime layout normalization failed")?;
+    let emit_debug_artifacts = cfg.raw.debug.generate_artifacts;
 
     let process_roots = combined_roots(&cfg.raw.strict_scan_roots, &cfg.raw.warn_scan_roots);
     let files = collect_files(root, &process_roots, cfg)?;
@@ -40,11 +41,9 @@ pub fn process_root(root: &Path, cfg: &CompiledConfig) -> Result<()> {
         patch_shebangs(&files)?;
     }
 
-    let artifact_index = crate::artifact_resolver::build_artifact_index(
-        root,
-        &cfg.raw.allowed_store_prefixes,
-    )
-    .context("failed to build artifact index")?;
+    let artifact_index =
+        crate::artifact_resolver::build_artifact_index(root, &cfg.raw.allowed_store_prefixes)
+            .context("failed to build artifact index")?;
 
     if cfg.raw.auto_patch.patch_elfs {
         auto_patch_elfs(
@@ -88,8 +87,13 @@ pub fn process_root(root: &Path, cfg: &CompiledConfig) -> Result<()> {
 
     apply_chmod_rules(root, cfg)?;
 
-    crate::runtime_wrappers::resolve_and_import_public_entrypoints(root, &artifact_index, &log)
-        .context("failed to resolve and import public entrypoints")?;
+    crate::runtime_wrappers::resolve_and_import_public_entrypoints(
+        root,
+        &artifact_index,
+        &log,
+        emit_debug_artifacts,
+    )
+    .context("failed to resolve and import public entrypoints")?;
 
     let mut repatch_roots = process_roots.clone();
     repatch_roots.push("/usr/libexec/antinix/imported-entrypoints".to_string());
@@ -99,11 +103,9 @@ pub fn process_root(root: &Path, cfg: &CompiledConfig) -> Result<()> {
     let repatch_graph = crate::elf_graph::build_elf_graph(&repatch_files)
         .context("failed to build repatch ELF provider graph")?;
 
-    let repatch_artifact_index = crate::artifact_resolver::build_artifact_index(
-        root,
-        &cfg.raw.allowed_store_prefixes,
-    )
-    .context("failed to rebuild artifact index after entrypoint import")?;
+    let repatch_artifact_index =
+        crate::artifact_resolver::build_artifact_index(root, &cfg.raw.allowed_store_prefixes)
+            .context("failed to rebuild artifact index after entrypoint import")?;
 
     if cfg.raw.auto_patch.patch_elfs {
         auto_patch_elfs(
@@ -117,33 +119,36 @@ pub fn process_root(root: &Path, cfg: &CompiledConfig) -> Result<()> {
         .context("failed to auto-patch imported entrypoints and libraries")?;
     }
 
-    crate::runtime_wrappers::apply_runtime_wrappers(root, &log)
+    crate::runtime_wrappers::apply_runtime_wrappers(root, &log, emit_debug_artifacts)
         .context("failed to apply runtime wrappers")?;
 
     let final_files = collect_files(root, &repatch_roots, cfg)?;
     let final_elf_graph = crate::elf_graph::build_elf_graph(&final_files)
         .context("failed to build final ELF provider graph")?;
 
-    crate::elf_graph::write_elf_graph_report(root, &final_elf_graph)
-        .context("failed to write ELF provider graph report")?;
-
-    write_remaining_nix_paths_artifact(root, &final_files)
-        .context("failed to write remaining nix paths artifact")?;
-    write_classification_artifact(root, &final_files)
-        .context("failed to write classification artifact")?;
-
     let elf_store_ref_audit =
         audit_elf_store_refs(&final_files).context("failed to audit ELF store references")?;
-    write_elf_store_ref_audit_artifact(root, &elf_store_ref_audit)
-        .context("failed to write ELF store reference audit artifact")?;
+    if emit_debug_artifacts {
+        crate::elf_graph::write_elf_graph_report(root, &final_elf_graph)
+            .context("failed to write ELF provider graph report")?;
+
+        write_remaining_nix_paths_artifact(root, &final_files)
+            .context("failed to write remaining nix paths artifact")?;
+        write_classification_artifact(root, &final_files)
+            .context("failed to write classification artifact")?;
+        write_elf_store_ref_audit_artifact(root, &elf_store_ref_audit)
+            .context("failed to write ELF store reference audit artifact")?;
+    }
     validate_no_store_refs_in_public_elf_metadata(&elf_store_ref_audit)
         .context("public or imported ELF metadata still contains /nix/store references")?;
 
     crate::validate::validate_root(root, cfg)?;
-    write_imported_artifacts_artifact(root, &log)
-        .context("failed to write imported artifacts artifact")?;
-    write_rewrite_log(root, &log)?;
-    write_rewrite_summary(root, &log)?;
+    if emit_debug_artifacts {
+        write_imported_artifacts_artifact(root, &log)
+            .context("failed to write imported artifacts artifact")?;
+        write_rewrite_log(root, &log)?;
+        write_rewrite_summary(root, &log)?;
+    }
 
     Ok(())
 }
@@ -338,7 +343,8 @@ pub fn apply_chmod_rules(root: &Path, cfg: &CompiledConfig) -> Result<()> {
             bail!("chmod target does not exist: {}", abs.display());
         }
 
-        let meta = fs::metadata(&abs).with_context(|| format!("failed to stat {}", abs.display()))?;
+        let meta =
+            fs::metadata(&abs).with_context(|| format!("failed to stat {}", abs.display()))?;
 
         #[cfg(unix)]
         {

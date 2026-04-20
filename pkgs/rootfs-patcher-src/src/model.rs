@@ -30,12 +30,16 @@ pub struct EntrypointNormalizationRecord {
     pub detail: String,
 }
 
-
-
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct ChmodConfig {
     #[serde(default)]
     pub make_executable: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct DebugConfig {
+    #[serde(default)]
+    pub generate_artifacts: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -155,6 +159,9 @@ pub struct Config {
 
     #[serde(default)]
     pub chmod: ChmodConfig,
+
+    #[serde(default)]
+    pub debug: DebugConfig,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

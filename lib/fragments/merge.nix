@@ -59,6 +59,10 @@ let
       "patching"
       "elfPatches"
     ]
+    [
+      "debug"
+      "watchPaths"
+    ]
   ];
 
   scalarKeys = [

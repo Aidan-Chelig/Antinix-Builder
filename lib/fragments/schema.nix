@@ -37,6 +37,12 @@ let
     # Shell hooks or build hooks to be interpreted downstream
     postBuild = [ ];
 
+    debug = {
+      tracePhases = false;
+      generatePatcherArtifacts = false;
+      watchPaths = [ ];
+    };
+
     # Advanced escape hatches
     patching = {
       # Simple string-for-string text rewrites

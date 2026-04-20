@@ -4,7 +4,6 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-
 #[derive(Debug, Clone)]
 pub struct ArtifactCandidate {
     pub path: String,
@@ -57,7 +56,16 @@ pub fn build_artifact_index(
 }
 
 fn index_rootfs(root: &Path, index: &mut ArtifactIndex) -> Result<()> {
-    for dir in ["/bin", "/sbin", "/usr/bin", "/usr/sbin", "/lib", "/lib64", "/usr/lib", "/usr/lib64"] {
+    for dir in [
+        "/bin",
+        "/sbin",
+        "/usr/bin",
+        "/usr/sbin",
+        "/lib",
+        "/lib64",
+        "/usr/lib",
+        "/usr/lib64",
+    ] {
         let abs_dir = root.join(dir.trim_start_matches('/'));
         if !abs_dir.exists() {
             continue;
@@ -131,9 +139,8 @@ fn candidate_from_path(
         .unwrap_or_default()
         .to_string();
 
-    let is_wrapper =
-        crate::runtime_wrappers::extract_nix_wrapper_target(&bytes).is_some()
-            || crate::runtime_wrappers::extract_shell_exec_target(&bytes).is_some();
+    let is_wrapper = crate::runtime_wrappers::extract_nix_wrapper_target(&bytes).is_some()
+        || crate::runtime_wrappers::extract_shell_exec_target(&bytes).is_some();
 
     let (kind, soname) = match Object::parse(&bytes) {
         Ok(Object::Elf(elf)) => {
@@ -176,14 +183,15 @@ fn insert_candidate(index: &mut ArtifactIndex, candidate: ArtifactCandidate) {
         .push(candidate.clone());
 
     if let Some(soname) = &candidate.soname {
-        index.by_soname.entry(soname.clone()).or_default().push(candidate);
+        index
+            .by_soname
+            .entry(soname.clone())
+            .or_default()
+            .push(candidate);
     }
 }
 
-pub fn resolve_executable(
-    index: &ArtifactIndex,
-    name: &str,
-) -> Option<ResolvedArtifact> {
+pub fn resolve_executable(index: &ArtifactIndex, name: &str) -> Option<ResolvedArtifact> {
     let candidates = index.by_basename.get(name)?;
 
     let best = choose_best_executable_candidate(candidates)?;
@@ -196,10 +204,7 @@ pub fn resolve_executable(
     })
 }
 
-pub fn resolve_shared_library(
-    index: &ArtifactIndex,
-    name: &str,
-) -> Option<ResolvedArtifact> {
+pub fn resolve_shared_library(index: &ArtifactIndex, name: &str) -> Option<ResolvedArtifact> {
     let candidates = index
         .by_soname
         .get(name)

@@ -118,6 +118,10 @@ let
     ];
   };
 
+  defaultDebug = {
+    generate_artifacts = false;
+  };
+
   mergeUnique = a: b: lib.unique (a ++ b);
 
   normalizePatchList =
@@ -180,6 +184,7 @@ in
     let
       patching = spec.patching or { };
       validationIn = spec.validation or { };
+      debugIn = spec.debug or { };
 
       ignore = patching.ignore or { };
       runtimeIn = patching.runtime or { };
@@ -237,6 +242,10 @@ in
         make_executable = mergeUnique defaultChmod.make_executable (patching.makeExecutable or [ ]);
       };
 
+      debug = defaultDebug // {
+        generate_artifacts = debugIn.generatePatcherArtifacts or false;
+      };
+
       textRewrites =
         attrTextRewritesToList (patching.textRewrites or { })
         ++ normalizePatchList (patching.textPatches or [ ]);
@@ -278,5 +287,6 @@ in
       runtime_layout = runtimeLayout;
       validation = validation;
       chmod = chmod;
+      debug = debug;
     };
 }

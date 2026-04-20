@@ -44,6 +44,7 @@ let
       services ? { },
       runtime ? { },
       postBuild ? [ ],
+      debug ? { },
       patching ? { },
       validation ? { },
       meta ? { },
@@ -64,6 +65,7 @@ let
         services
         runtime
         postBuild
+        debug
         patching
         validation
         meta
@@ -98,6 +100,7 @@ in
 ##@ param: services attrset Service and init metadata merged into the system spec.
 ##@ param: runtime attrset Runtime directory declarations such as tmpfsDirs, stateDirs, and dataDirs.
 ##@ param: postBuild list Shell snippets run after rootfs patching completes.
+##@ param: debug attrset Debug controls including phase tracing, watched paths, and patcher artifact generation.
 ##@ param: patching attrset Advanced patcher configuration overrides.
 ##@ param: validation attrset Validation policy overrides for the normalized spec.
 ##@ param: meta attrset Free-form metadata attached to the resulting system spec.
@@ -132,6 +135,7 @@ args@{
   services ? { },
   runtime ? { },
   postBuild ? [ ],
+  debug ? { },
   patching ? { },
   validation ? { },
   meta ? { },
@@ -219,6 +223,21 @@ let
   initFragment = realizeFragment (getInitFragment init);
   packageManagerFragment = realizeFragment (getPackageManagerFragment packageManager);
 
+  effectiveDebug = {
+    tracePhases = debug.tracePhases or false;
+    generatePatcherArtifacts = debug.generatePatcherArtifacts or false;
+    watchPaths = lib.unique (debug.watchPaths or [ ]);
+  };
+
+  effectiveMeta =
+    meta
+    // {
+      selectedInit = init;
+      selectedPackageManager = packageManager;
+      kernelVersion = kernelVersion;
+      includeKernelModules = includeKernelModules;
+    };
+
   userBaseFragment =
     let
       _ = _traceKernelImports;
@@ -238,9 +257,11 @@ let
       services
       runtime
       postBuild
+      debug
       validation
-      meta
       ;
+    debug = effectiveDebug;
+    meta = effectiveMeta;
     imports = kernelImports // imports;
     patching = effectivePatching;
   };
@@ -267,6 +288,7 @@ let
         name = systemName;
         users = normalizedSpec.users or { };
         groups = normalizedSpec.groups or { };
+        debug = normalizedSpec.debug or { };
       }
     else
       null;
@@ -283,9 +305,11 @@ let
               name = systemName;
               users = normalizedSpec.users or { };
               groups = normalizedSpec.groups or { };
+              debug = normalizedSpec.debug or { };
             };
         name = systemName;
         volumeLabel = systemName;
+        debug = normalizedSpec.debug or { };
       }
     else
       null;

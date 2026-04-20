@@ -172,6 +172,7 @@ in
     services
     runtime
     postBuild
+    debug
     patching
     validation
     meta

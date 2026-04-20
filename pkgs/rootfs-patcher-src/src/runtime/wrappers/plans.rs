@@ -4,22 +4,28 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use super::artifacts::{write_runtime_detection_artifact, write_runtime_wrapper_artifact};
+use super::entrypoints::extract_shell_exec_target;
 use super::{
     EnvWrapperSpec, LuaPlan, PerlPlan, PythonPlan, RuntimeDetectionReport, RuntimeFamilyPlan,
     RuntimePlan,
 };
-use super::artifacts::{write_runtime_detection_artifact, write_runtime_wrapper_artifact};
-use super::entrypoints::extract_shell_exec_target;
 
-pub(super) fn apply_runtime_wrappers(root: &Path, log: &Arc<RewriteLog>) -> Result<()> {
+pub(super) fn apply_runtime_wrappers(
+    root: &Path,
+    log: &Arc<RewriteLog>,
+    emit_debug_artifacts: bool,
+) -> Result<()> {
     let plan = detect_runtime_plan(root).context("failed to detect runtime plan")?;
-    let report = build_runtime_detection_report(&plan);
 
     apply_runtime_plan(root, &plan, log).context("failed to apply runtime plan")?;
-    write_runtime_wrapper_artifact(root, &plan)
-        .context("failed to write runtime wrapper artifact")?;
-    write_runtime_detection_artifact(root, &report)
-        .context("failed to write runtime detection artifact")?;
+    if emit_debug_artifacts {
+        let report = build_runtime_detection_report(&plan);
+        write_runtime_wrapper_artifact(root, &plan)
+            .context("failed to write runtime wrapper artifact")?;
+        write_runtime_detection_artifact(root, &report)
+            .context("failed to write runtime detection artifact")?;
+    }
     Ok(())
 }
 
@@ -184,7 +190,8 @@ fn detect_lua_binaries(root: &Path) -> Result<Vec<PathBuf>> {
     for entry in fs::read_dir(&usr_bin)
         .with_context(|| format!("failed to read directory {}", usr_bin.display()))?
     {
-        let entry = entry.with_context(|| format!("failed to read entry in {}", usr_bin.display()))?;
+        let entry =
+            entry.with_context(|| format!("failed to read entry in {}", usr_bin.display()))?;
         let path = entry.path();
         let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
             continue;
@@ -216,7 +223,8 @@ fn detect_lua_path_entries(root: &Path) -> Result<Vec<String>> {
         for entry in fs::read_dir(&base)
             .with_context(|| format!("failed to read directory {}", base.display()))?
         {
-            let entry = entry.with_context(|| format!("failed to read entry in {}", base.display()))?;
+            let entry =
+                entry.with_context(|| format!("failed to read entry in {}", base.display()))?;
             let path = entry.path();
             if !path.is_dir() {
                 continue;
@@ -313,7 +321,8 @@ fn detect_python_binaries(root: &Path) -> Result<Vec<PathBuf>> {
     for entry in fs::read_dir(&usr_bin)
         .with_context(|| format!("failed to read directory {}", usr_bin.display()))?
     {
-        let entry = entry.with_context(|| format!("failed to read entry in {}", usr_bin.display()))?;
+        let entry =
+            entry.with_context(|| format!("failed to read entry in {}", usr_bin.display()))?;
         let path = entry.path();
         let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
             continue;
@@ -334,9 +343,7 @@ fn looks_like_python_binary(name: &str) -> bool {
         return false;
     }
 
-    name["python3.".len()..]
-        .chars()
-        .all(|c| c.is_ascii_digit())
+    name["python3.".len()..].chars().all(|c| c.is_ascii_digit())
 }
 
 fn detect_pythonpath_entries(root: &Path) -> Result<Vec<String>> {
@@ -349,7 +356,8 @@ fn detect_pythonpath_entries(root: &Path) -> Result<Vec<String>> {
     for entry in fs::read_dir(&usr_lib)
         .with_context(|| format!("failed to read directory {}", usr_lib.display()))?
     {
-        let entry = entry.with_context(|| format!("failed to read entry in {}", usr_lib.display()))?;
+        let entry =
+            entry.with_context(|| format!("failed to read entry in {}", usr_lib.display()))?;
         let path = entry.path();
         if !path.is_dir() {
             continue;
@@ -387,9 +395,7 @@ fn looks_like_python_libdir(name: &str) -> bool {
         return false;
     }
 
-    name["python3.".len()..]
-        .chars()
-        .all(|c| c.is_ascii_digit())
+    name["python3.".len()..].chars().all(|c| c.is_ascii_digit())
 }
 
 fn perl_wrapper_specs(plan: &PerlPlan) -> Vec<EnvWrapperSpec> {
@@ -455,7 +461,8 @@ fn detect_perl_binaries(root: &Path) -> Result<Vec<PathBuf>> {
     for entry in fs::read_dir(&usr_bin)
         .with_context(|| format!("failed to read directory {}", usr_bin.display()))?
     {
-        let entry = entry.with_context(|| format!("failed to read entry in {}", usr_bin.display()))?;
+        let entry =
+            entry.with_context(|| format!("failed to read entry in {}", usr_bin.display()))?;
         let path = entry.path();
         let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
             continue;

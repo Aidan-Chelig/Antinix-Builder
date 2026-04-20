@@ -1,5 +1,5 @@
 use crate::artifact_resolver::{
-    resolve_executable, ArtifactIndex, ArtifactKind, ArtifactOrigin, ResolvedArtifact,
+    ArtifactIndex, ArtifactKind, ArtifactOrigin, ResolvedArtifact, resolve_executable,
 };
 use crate::model::{EntrypointNormalizationRecord, RewriteEvent, RewriteLog};
 use anyhow::{Context, Result};
@@ -19,6 +19,7 @@ pub(super) fn resolve_and_import_public_entrypoints(
     root: &Path,
     artifact_index: &ArtifactIndex,
     log: &Arc<RewriteLog>,
+    emit_debug_artifacts: bool,
 ) -> Result<()> {
     let mut records = Vec::new();
 
@@ -49,7 +50,9 @@ pub(super) fn resolve_and_import_public_entrypoints(
         }
     }
 
-    write_entrypoint_normalization_artifact(root, &records)?;
+    if emit_debug_artifacts {
+        write_entrypoint_normalization_artifact(root, &records)?;
+    }
     Ok(())
 }
 
@@ -65,8 +68,8 @@ fn resolve_and_import_public_entrypoint_if_needed(
         return Ok(());
     }
 
-    let bytes = fs::read(&bin_abs)
-        .with_context(|| format!("failed to read {}", bin_abs.display()))?;
+    let bytes =
+        fs::read(&bin_abs).with_context(|| format!("failed to read {}", bin_abs.display()))?;
 
     let store_target = extract_nix_wrapper_target(&bytes);
     let shell_target = extract_shell_exec_target(&bytes);
@@ -148,8 +151,12 @@ fn resolve_and_import_public_entrypoint_if_needed(
 
     let script = format!("#!/bin/sh\nexec {} \"$@\"\n", leaf);
 
-    fs::write(&bin_abs, script.as_bytes())
-        .with_context(|| format!("failed to write normalized entrypoint {}", bin_abs.display()))?;
+    fs::write(&bin_abs, script.as_bytes()).with_context(|| {
+        format!(
+            "failed to write normalized entrypoint {}",
+            bin_abs.display()
+        )
+    })?;
 
     #[cfg(unix)]
     {
@@ -383,5 +390,8 @@ fn resolve_in_image_wrapper_target(
     family.sort();
     family.dedup();
 
-    exact.into_iter().next().or_else(|| family.into_iter().next())
+    exact
+        .into_iter()
+        .next()
+        .or_else(|| family.into_iter().next())
 }

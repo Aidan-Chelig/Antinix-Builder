@@ -51,14 +51,14 @@ fn store_suffix_after_package(s: &str) -> Option<String> {
 
 fn map_runtime_suffix_to_fhs(suffix: &str) -> Option<String> {
     // Prefer more specific roots first.
-const PREFIXES: [(&str, &str); 6] = [
-    ("/share/", "/usr/share/"),
-    ("/lib64/", "/usr/lib64/"),
-    ("/lib/", "/usr/lib/"),
-    ("/libexec/", "/usr/libexec/"),
-    ("/bin/", "/usr/bin/"),
-    ("/sbin/", "/usr/sbin/"),
-];
+    const PREFIXES: [(&str, &str); 6] = [
+        ("/share/", "/usr/share/"),
+        ("/lib64/", "/usr/lib64/"),
+        ("/lib/", "/usr/lib/"),
+        ("/libexec/", "/usr/libexec/"),
+        ("/bin/", "/usr/bin/"),
+        ("/sbin/", "/usr/sbin/"),
+    ];
 
     for (src, dst) in PREFIXES.iter() {
         if let Some(rest) = suffix.strip_prefix(src) {
@@ -317,7 +317,9 @@ fn normalize_needed_name(
         return match resolved.origin {
             crate::artifact_resolver::ArtifactOrigin::Rootfs => Some(resolved.resolved_path),
             crate::artifact_resolver::ArtifactOrigin::ClosureImported => {
-                import_resolved_closure_library(root, Path::new(s), &resolved, log).ok().flatten()
+                import_resolved_closure_library(root, Path::new(s), &resolved, log)
+                    .ok()
+                    .flatten()
             }
         };
     }
@@ -503,7 +505,8 @@ fn minimal_rpath_from_needed(
             need.clone()
         };
 
-        if let Some(resolved) = crate::artifact_resolver::resolve_shared_library(artifact_index, &base)
+        if let Some(resolved) =
+            crate::artifact_resolver::resolve_shared_library(artifact_index, &base)
         {
             if let Some(dir) = provider_dir(&resolved.resolved_path) {
                 if !is_default_runtime_dir(&dir) && seen.insert(dir.clone()) {

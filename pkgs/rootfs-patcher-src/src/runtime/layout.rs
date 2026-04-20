@@ -1,12 +1,17 @@
 use crate::fs_walk::collect_files;
-use crate::model::CompiledConfig;
+use crate::model::{CompiledConfig, RewriteEvent, RewriteLog};
 use crate::paths::normalize_rel_string;
 use anyhow::{Context, Result, bail};
 use goblin::Object;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
-pub fn normalize_runtime_layout(root: &Path, cfg: &CompiledConfig) -> Result<()> {
+pub fn normalize_runtime_layout(
+    root: &Path,
+    cfg: &CompiledConfig,
+    log: &Arc<RewriteLog>,
+) -> Result<()> {
     let rl = &cfg.raw.runtime_layout;
     if !rl.normalize_runtime_layout {
         return Ok(());
@@ -16,11 +21,11 @@ pub fn normalize_runtime_layout(root: &Path, cfg: &CompiledConfig) -> Result<()>
         || "runtime layout normalization requested, but no ELF interpreter could be detected",
     )?;
 
-    rebuild_runtime_dirs(root, rl.lib_roots.as_slice(), "/lib")?;
-    rebuild_runtime_dirs(root, rl.lib64_roots.as_slice(), "/lib64")?;
+    rebuild_runtime_dirs(root, rl.lib_roots.as_slice(), "/lib", log)?;
+    rebuild_runtime_dirs(root, rl.lib64_roots.as_slice(), "/lib64", log)?;
 
     if let Some(dest_dir) = rl.install_detected_interpreter_to.as_deref() {
-        install_detected_interpreter(root, &detected, dest_dir)?;
+        install_detected_interpreter(root, &detected, dest_dir, log)?;
     }
 
     Ok(())
@@ -73,7 +78,12 @@ fn interpreter_from_path(path: &Path) -> Result<Option<String>> {
     Ok(elf.interpreter.map(|s| s.to_string()))
 }
 
-fn rebuild_runtime_dirs(root: &Path, sources: &[String], dest_rel: &str) -> Result<()> {
+fn rebuild_runtime_dirs(
+    root: &Path,
+    sources: &[String],
+    dest_rel: &str,
+    log: &Arc<RewriteLog>,
+) -> Result<()> {
     let dest_rel = normalize_rel_string(dest_rel);
     let dest_abs = root.join(dest_rel.trim_start_matches('/'));
 
@@ -110,6 +120,15 @@ fn rebuild_runtime_dirs(root: &Path, sources: &[String], dest_rel: &str) -> Resu
                 )
             })?;
 
+            push_runtime_layout_event(
+                log,
+                dest_rel.as_str(),
+                "preserve-modules",
+                Some(modules_abs.display().to_string()),
+                Some(preserved.display().to_string()),
+                None,
+            );
+
             Some((modules_abs, preserved))
         } else {
             None
@@ -122,14 +141,17 @@ fn rebuild_runtime_dirs(root: &Path, sources: &[String], dest_rel: &str) -> Resu
         if meta.file_type().is_dir() && !meta.file_type().is_symlink() {
             fs::remove_dir_all(&dest_abs)
                 .with_context(|| format!("failed to remove {}", dest_abs.display()))?;
+            push_runtime_layout_event(log, dest_rel.as_str(), "remove-dir", None, None, None);
         } else {
             fs::remove_file(&dest_abs)
                 .with_context(|| format!("failed to remove {}", dest_abs.display()))?;
+            push_runtime_layout_event(log, dest_rel.as_str(), "remove-path", None, None, None);
         }
     }
 
     fs::create_dir_all(&dest_abs)
         .with_context(|| format!("failed to create {}", dest_abs.display()))?;
+    push_runtime_layout_event(log, dest_rel.as_str(), "create-dir", None, None, None);
 
     for src_rel in sources {
         let src_rel = normalize_rel_string(src_rel);
@@ -150,6 +172,14 @@ fn rebuild_runtime_dirs(root: &Path, sources: &[String], dest_rel: &str) -> Resu
         }
 
         copy_dir_contents_dereference(&src_abs, &dest_abs)?;
+        push_runtime_layout_event(
+            log,
+            dest_rel.as_str(),
+            "merge-runtime-source",
+            Some(src_rel),
+            Some(dest_rel.clone()),
+            None,
+        );
     }
 
     // Restore preserved kernel modules after rebuilding lib/lib64.
@@ -178,6 +208,14 @@ fn rebuild_runtime_dirs(root: &Path, sources: &[String], dest_rel: &str) -> Resu
                 modules_abs.display()
             )
         })?;
+        push_runtime_layout_event(
+            log,
+            dest_rel.as_str(),
+            "restore-modules",
+            Some(preserved.display().to_string()),
+            Some(modules_abs.display().to_string()),
+            None,
+        );
     }
 
     Ok(())
@@ -207,7 +245,12 @@ fn resolve_detected_interpreter_source(root: &Path, detected: &str) -> Result<Pa
     );
 }
 
-fn install_detected_interpreter(root: &Path, detected: &str, dest_dir_rel: &str) -> Result<()> {
+fn install_detected_interpreter(
+    root: &Path,
+    detected: &str,
+    dest_dir_rel: &str,
+    log: &Arc<RewriteLog>,
+) -> Result<()> {
     let src_abs = resolve_detected_interpreter_source(root, detected)?;
 
     let dest_dir_rel = normalize_rel_string(dest_dir_rel);
@@ -223,8 +266,34 @@ fn install_detected_interpreter(root: &Path, detected: &str, dest_dir_rel: &str)
     let dest_abs = dest_dir_abs.join(base);
     copy_entry_dereference(&src_abs, &dest_abs)
         .with_context(|| format!("failed to install interpreter into {}", dest_abs.display()))?;
+    push_runtime_layout_event(
+        log,
+        &dest_dir_rel,
+        "install-detected-interpreter",
+        Some(src_abs.display().to_string()),
+        Some(dest_abs.display().to_string()),
+        Some(detected.to_string()),
+    );
 
     Ok(())
+}
+
+fn push_runtime_layout_event(
+    log: &Arc<RewriteLog>,
+    file: &str,
+    action: &str,
+    from: Option<String>,
+    to: Option<String>,
+    note: Option<String>,
+) {
+    log.push(RewriteEvent {
+        pass: "runtime-layout".to_string(),
+        file: file.to_string(),
+        action: action.to_string(),
+        from,
+        to,
+        note,
+    });
 }
 
 fn copy_dir_contents_dereference(src_dir: &Path, dest_dir: &Path) -> Result<()> {

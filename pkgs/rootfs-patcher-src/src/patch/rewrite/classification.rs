@@ -80,9 +80,7 @@ pub(super) fn classify_file(path: &Path, rel: &str, bytes: &[u8]) -> BinaryClass
                     || rel.starts_with("/usr/sbin/")
                 {
                     crate::model::FileRole::TextScript
-                } else if rel.contains("/etc/")
-                    || rel.contains("config")
-                    || rel.contains("Config")
+                } else if rel.contains("/etc/") || rel.contains("config") || rel.contains("Config")
                 {
                     crate::model::FileRole::TextConfig
                 } else {
@@ -148,7 +146,10 @@ fn categorize_remaining_nix_paths(path: &str, bytes: &[u8], samples: &[String]) 
     let lower = path.to_ascii_lowercase();
 
     if matches!(Object::parse(bytes), Ok(Object::Elf(_))) {
-        if samples.iter().any(|s| s.contains("-glibc-") || s.contains("ld-linux")) {
+        if samples
+            .iter()
+            .any(|s| s.contains("-glibc-") || s.contains("ld-linux"))
+        {
             return "elf-loader-search-path".to_string();
         }
 
