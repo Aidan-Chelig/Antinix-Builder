@@ -374,13 +374,13 @@ EOF
     export dracutbasedir="${dracut}/lib/dracut"
 
     MODULES_ROOT="$PWD/modules-root"
-    MODULES_DIR="$MODULES_ROOT/lib/modules/${kernelVersion}"
+    MODULES_DIR="$MODULES_ROOT/lib/modules/${effectiveKernelVersion}"
 
     mkdir -p "$(dirname "$MODULES_DIR")"
-    cp -a "${moduleTree}/lib/modules/${kernelVersion}" "$MODULES_DIR"
+    cp -a "${effectiveModuleTree}/lib/modules/${effectiveKernelVersion}" "$MODULES_DIR"
     chmod -R u+w "$MODULES_ROOT" 2>/dev/null || true
 
-    depmod -b "$MODULES_ROOT" "${kernelVersion}"
+    depmod -b "$MODULES_ROOT" "${effectiveKernelVersion}"
 
     ${dracut}/bin/dracut \
       --force \
