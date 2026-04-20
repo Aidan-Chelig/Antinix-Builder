@@ -1,0 +1,7 @@
+interface:
+  display_name: "Bacon Rust Check"
+  short_description: "Run bacon checks for Rust projects"
+  default_prompt: "Use $bacon-rust-check to verify this Rust project with bacon."
+
+policy:
+  allow_implicit_invocation: true

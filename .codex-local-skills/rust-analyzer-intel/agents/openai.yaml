@@ -1,0 +1,7 @@
+interface:
+  display_name: "Rust Analyzer Intel"
+  short_description: "Use rust-analyzer to inspect Rust structure"
+  default_prompt: "Use $rust-analyzer-intel to inspect this Rust project semantically."
+
+policy:
+  allow_implicit_invocation: true
