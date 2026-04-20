@@ -360,10 +360,6 @@ in
     ];
   };
 
-  services = {
-    init.name = "openrc";
-  };
-
   meta = {
     providesInit = true;
   };

@@ -167,6 +167,14 @@ libFor =
               init,
               packageManager,
             }:
+            let
+              supportsUserServices = builtins.elem init [
+                "dinit"
+                "openrc"
+                "runit"
+                "s6"
+              ];
+            in
             antinix.mkSystem {
               name = "${packageManager}-${init}";
               hostname = "antinix";
@@ -196,6 +204,19 @@ libFor =
                   gid = 0;
                 };
               };
+
+              services =
+                lib.optionalAttrs supportsUserServices {
+                  hello-world = antinix.schema.mkService {
+                    description = "Emit a hello-world banner for VM variants";
+                    command = [
+                      "/bin/sh"
+                      "-c"
+                      "echo 'hello world from antinix service'; while true; do sleep 3600; done"
+                    ];
+                    restart = if init == "openrc" then "none" else "always";
+                  };
+                };
 
               files."/etc/issue" = antinix.schema.mkFile {
                 text = ''

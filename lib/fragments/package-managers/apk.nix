@@ -75,10 +75,6 @@ in
     ''
   ];
 
-  services = {
-    packageManager.name = "apk";
-  };
-
   meta = {
     providesPackageManager = true;
   };

@@ -51,10 +51,6 @@
     dataDirs = [ ];
   };
 
-  services = {
-    init.name = "simple";
-  };
-
   meta = {
     providesInit = true;
   };

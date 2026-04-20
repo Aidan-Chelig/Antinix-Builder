@@ -44,10 +44,6 @@
     };
   };
 
-  services = {
-    packageManager.name = "opkg";
-  };
-
   meta = {
     providesPackageManager = true;
   };

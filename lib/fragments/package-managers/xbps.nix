@@ -27,10 +27,6 @@
     };
   };
 
-  services = {
-    packageManager.name = "xbps";
-  };
-
   meta = {
     providesPackageManager = true;
   };

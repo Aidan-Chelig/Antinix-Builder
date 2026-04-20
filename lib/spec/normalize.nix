@@ -1,4 +1,4 @@
-{ lib, schema }:
+{ lib, schema, services }:
 
 let
   inherit (schema) defaults;
@@ -162,6 +162,8 @@ let
   normalizedDirectories = normalizeDirectories (
     (runtimeDirectories (merged.runtime or { })) // (merged.directories or { })
   );
+
+  normalizedServices = services.normalizeServices (merged.services or { });
 in
 {
   inherit (merged)
@@ -169,7 +171,6 @@ in
     hostname
     packages
     symlinks
-    services
     runtime
     postBuild
     debug
@@ -184,4 +185,5 @@ in
   directories = normalizedDirectories;
   users = normalizedUsers;
   groups = normalizedGroups;
+  services = normalizedServices;
 }

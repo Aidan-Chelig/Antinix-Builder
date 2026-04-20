@@ -183,10 +183,6 @@ in
     ];
   };
 
-  services = {
-    init.name = "s6";
-  };
-
   meta = {
     providesInit = true;
   };

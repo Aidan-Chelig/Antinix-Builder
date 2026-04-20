@@ -188,10 +188,6 @@ in
     ];
   };
 
-  services = {
-    init.name = "busybox";
-  };
-
   meta = {
     providesInit = true;
   };

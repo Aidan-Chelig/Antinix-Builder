@@ -179,10 +179,6 @@ in
     ];
   };
 
-  services = {
-    init.name = "runit";
-  };
-
   meta = {
     providesInit = true;
   };

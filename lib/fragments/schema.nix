@@ -208,6 +208,50 @@ let
       inherit gid;
     };
 
+  ##@ name: mkService
+  ##@ path: lib.schema.mkService
+  ##@ kind: helper
+  ##@ summary: Define a declarative service for mkSystem.
+  ##@ param: enable bool Whether the service should be rendered for the selected init.
+  ##@ param: description string? Optional service description.
+  ##@ param: command list Command and arguments to execute.
+  ##@ param: environment attrset Environment variables exported before exec.
+  ##@ param: dependsOn list Other service names required before startup.
+  ##@ param: wantedBy list Activation targets. Currently supports "default".
+  ##@ param: runAs string Runtime user. Root-only in the current implementation.
+  ##@ param: oneShot bool Whether the service should run once and exit.
+  ##@ param: restart string Restart policy: none, on-failure, or always.
+  ##@ param: init attrset Init-specific override namespace reserved for backend-specific extensions.
+  ##@ returns: attrset describing a service entry.
+
+  mkService =
+    {
+      enable ? true,
+      description ? null,
+      command,
+      environment ? { },
+      dependsOn ? [ ],
+      wantedBy ? [ "default" ],
+      runAs ? "root",
+      oneShot ? false,
+      restart ? if oneShot then "none" else "always",
+      init ? { },
+    }:
+    {
+      inherit
+        enable
+        description
+        command
+        environment
+        dependsOn
+        wantedBy
+        runAs
+        oneShot
+        restart
+        init
+        ;
+    };
+
   mkTextPatch =
     {
       from,
@@ -278,6 +322,7 @@ in
     mkImport
     mkUser
     mkGroup
+    mkService
     mkTextPatch
     mkBinaryPatch
     mkElfPatch

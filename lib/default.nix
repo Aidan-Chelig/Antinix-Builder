@@ -7,8 +7,11 @@ let
     inherit schema;
   };
 
+  serviceApi = pkgs.callPackage ./system/services.nix { };
+
   normalize = pkgs.callPackage ./spec/normalize.nix {
     inherit schema;
+    services = serviceApi;
   };
 
 initSystems = guestPkgs.callPackage ./fragments/init-systems/default.nix { };
@@ -62,6 +65,7 @@ rootfsPatcher = linuxBuildPkgs.callPackage ../pkgs/rootfs-patcher.nix { };
       schema
       merge
       normalize
+      serviceApi
       mkRootfsTree
       mkRootfsTarball
       mkRootfsImage
@@ -176,7 +180,7 @@ in
   ##@ path: lib.schema
   ##@ kind: module
   ##@ summary: Consumer-facing schema helpers.
-  ##@ returns: attrset exposing mkFile, mkDirectory, mkImport, mkUser, mkGroup.
+  ##@ returns: attrset exposing mkFile, mkDirectory, mkImport, mkUser, mkGroup, and mkService.
   schema = schema;
 
   ##@ name: initSystems

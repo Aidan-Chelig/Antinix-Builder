@@ -3,6 +3,7 @@
   schema,
   merge,
   normalize,
+  serviceApi,
   mkRootfsTree,
   mkRootfsTarball ? null,
   mkRootfsImage ? null,
@@ -97,7 +98,7 @@ in
 ##@ param: motd string? Optional message of the day text.
 ##@ param: users attrset User declarations keyed by user name.
 ##@ param: groups attrset Group declarations keyed by group name.
-##@ param: services attrset Service and init metadata merged into the system spec.
+##@ param: services attrset Declarative service definitions keyed by service name.
 ##@ param: runtime attrset Runtime directory declarations such as tmpfsDirs, stateDirs, and dataDirs.
 ##@ param: postBuild list Shell snippets run after rootfs patching completes.
 ##@ param: debug attrset Debug controls. Supports `tracePhases`, `watchPaths`, and `generatePatcherArtifacts`.
@@ -274,7 +275,19 @@ let
     ++ [ userBaseFragment ]
   );
 
-  normalizedSpec = normalize mergedFragment;
+  normalizedBaseSpec = normalize mergedFragment;
+
+  renderedServices = serviceApi.renderServices {
+    inherit init;
+    services = normalizedBaseSpec.services or { };
+  };
+
+  normalizedSpec = normalize (
+    (merge.mergeTwo mergedFragment renderedServices.fragment)
+    // {
+      services = renderedServices.services;
+    }
+  );
 
   systemName = if normalizedSpec.name != null then normalizedSpec.name else "rootfs";
 

@@ -46,10 +46,6 @@
     };
   };
 
-  services = {
-    packageManager.name = "pacman";
-  };
-
   meta = {
     providesPackageManager = true;
   };

@@ -167,10 +167,6 @@ in
     ];
   };
 
-  services = {
-    init.name = "dinit";
-  };
-
   meta = {
     providesInit = true;
   };
