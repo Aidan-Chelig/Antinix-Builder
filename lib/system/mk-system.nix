@@ -100,7 +100,7 @@ in
 ##@ param: services attrset Service and init metadata merged into the system spec.
 ##@ param: runtime attrset Runtime directory declarations such as tmpfsDirs, stateDirs, and dataDirs.
 ##@ param: postBuild list Shell snippets run after rootfs patching completes.
-##@ param: debug attrset Debug controls including phase tracing, watched paths, and patcher artifact generation.
+##@ param: debug attrset Debug controls. Supports `tracePhases`, `watchPaths`, and `generatePatcherArtifacts`.
 ##@ param: patching attrset Advanced patcher configuration overrides.
 ##@ param: validation attrset Validation policy overrides for the normalized spec.
 ##@ param: meta attrset Free-form metadata attached to the resulting system spec.

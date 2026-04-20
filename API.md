@@ -94,7 +94,14 @@ Build a dracut initrd for a kernel or nixosSystem.
 #### Examples
 
 ```nix
-antinixLib.mkInitrd { name = "initrd.img"; nixosSystem = kernelSystem; extraDrivers = [ "virtio_blk" "ext4" ]; }
+antinixLib.mkInitrd {
+  name = "initrd.img";
+  nixosSystem = kernelSystem;
+  extraDrivers = [
+    "virtio_blk"
+    "ext4"
+  ];
+}
 ```
 
 ### mkOverlayReport
@@ -125,6 +132,7 @@ Build a bootable disk image from a rootfs tree.
 
 - `rootfs` *path* — Rootfs tree to install into the image.
 - `name` *string?* — Output image name.
+- `debug` *attrset?* — Debug controls forwarded from the normalized system spec, including phase tracing and watched paths.
 
 #### Returns
 
@@ -144,6 +152,7 @@ Package a rootfs tree into a tarball with ownership and SUID metadata applied.
 - `name` *string?* — Output tarball name prefix.
 - `users` *attrset?* — User definitions used to restore ownership in the archive.
 - `groups` *attrset?* — Group definitions used to resolve ownership in the archive.
+- `debug` *attrset?* — Debug controls forwarded from the normalized system spec, including phase tracing and watched paths.
 
 #### Returns
 
@@ -160,6 +169,9 @@ Build a processed rootfs tree from a normalized system specification.
 #### Parameters
 
 - `spec` *attrset* — Normalized or consumer-authored system specification.
+- `spec.debug.tracePhases` *bool?* — Emit phase checkpoint files under /debug during rootfs construction.
+- `spec.debug.watchPaths` *list?* — Paths recorded in each phase checkpoint artifact.
+- `spec.debug.generatePatcherArtifacts` *bool?* — Enable Rust rootfs-patcher debug artifacts under /debug.
 
 #### Returns
 
@@ -198,7 +210,15 @@ Build a QEMU VM launcher for a rootfs image and initrd.
 #### Examples
 
 ```nix
-antinixLib.mkRunVm { name = "run-demo"; rootfsImage = demoSystem.image; kernelImage = "${kernel}/bzImage"; initrd = demoInitrd; hostSystem = system; guestSystem = system; graphics = false; }
+antinixLib.mkRunVm {
+  name = "run-demo";
+  rootfsImage = demoSystem.image;
+  kernelImage = "${kernel}/bzImage";
+  initrd = demoInitrd;
+  hostSystem = system;
+  guestSystem = system;
+  graphics = false;
+}
 ```
 
 ### mkSystem
@@ -233,6 +253,7 @@ Build a system spec and rootfs artifacts.
 - `services` *attrset* — Service and init metadata merged into the system spec.
 - `runtime` *attrset* — Runtime directory declarations such as tmpfsDirs, stateDirs, and dataDirs.
 - `postBuild` *list* — Shell snippets run after rootfs patching completes.
+- `debug` *attrset* — Debug controls. Supports `tracePhases`, `watchPaths`, and `generatePatcherArtifacts`.
 - `patching` *attrset* — Advanced patcher configuration overrides.
 - `validation` *attrset* — Validation policy overrides for the normalized spec.
 - `meta` *attrset* — Free-form metadata attached to the resulting system spec.
@@ -246,7 +267,13 @@ Build a system spec and rootfs artifacts.
 #### Examples
 
 ```nix
-antinixLib.mkSystem { name = "demo"; init = "openrc"; packageManager = "xbps"; buildImage = true; nixosSystem = kernelSystem; }
+antinixLib.mkSystem {
+  name = "demo";
+  init = "openrc";
+  packageManager = "xbps";
+  buildImage = true;
+  nixosSystem = kernelSystem;
+}
 ```
 
 ### normalize

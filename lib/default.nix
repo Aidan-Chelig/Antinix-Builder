@@ -147,6 +147,9 @@ in
   ##@ kind: function
   ##@ summary: Build a processed rootfs tree from a normalized system specification.
   ##@ param: spec attrset Normalized or consumer-authored system specification.
+  ##@ param: spec.debug.tracePhases bool? Emit phase checkpoint files under /debug during rootfs construction.
+  ##@ param: spec.debug.watchPaths list? Paths recorded in each phase checkpoint artifact.
+  ##@ param: spec.debug.generatePatcherArtifacts bool? Enable Rust rootfs-patcher debug artifacts under /debug.
   ##@ returns: Derivation containing the assembled rootfs tree.
 
   ##@ name: mkRootfsTarball
@@ -157,6 +160,7 @@ in
   ##@ param: name string? Output tarball name prefix.
   ##@ param: users attrset? User definitions used to restore ownership in the archive.
   ##@ param: groups attrset? Group definitions used to resolve ownership in the archive.
+  ##@ param: debug attrset? Debug controls forwarded from the normalized system spec, including phase tracing and watched paths.
   ##@ returns: Derivation producing a compressed rootfs tarball.
 
   ##@ name: mkRootfsImage
@@ -165,6 +169,7 @@ in
   ##@ summary: Build a bootable disk image from a rootfs tree.
   ##@ param: rootfs path Rootfs tree to install into the image.
   ##@ param: name string? Output image name.
+  ##@ param: debug attrset? Debug controls forwarded from the normalized system spec, including phase tracing and watched paths.
   ##@ returns: Derivation producing a disk image file.
 
   ##@ name: schema

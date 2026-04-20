@@ -37,9 +37,13 @@ let
     # Shell hooks or build hooks to be interpreted downstream
     postBuild = [ ];
 
+    # Debug and tracing controls used by the rootfs builders.
     debug = {
+      # Emit phase checkpoint files such as /debug/phase-pre-process.txt.
       tracePhases = false;
+      # Let the Rust rootfs patcher write its own debug artifacts under /debug.
       generatePatcherArtifacts = false;
+      # Paths to inspect automatically at each traced phase.
       watchPaths = [ ];
     };
 
