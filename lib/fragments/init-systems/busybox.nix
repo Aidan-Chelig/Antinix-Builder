@@ -37,50 +37,65 @@ in
       mode = "0644";
     };
 
-    "/etc/init.d/rcS" = {
-      text = ''
-        #!/bin/sh
-        set -eu
+"/etc/init.d/rcS" = {
+  text = ''
+    #!/bin/sh
+    set -eu
 
-        export HOME=/root
-        export USER=root
-        export LOGNAME=root
-        export SHELL=/bin/sh
-        export PATH=/bin:/usr/bin:/sbin:/usr/sbin
-        export TERM="''${TERM:-linux}"
-        export TERMINFO_DIRS="''${TERMINFO_DIRS:-/lib/terminfo:/usr/share/terminfo:/usr/lib/terminfo}"
+    export HOME=/root
+    export USER=root
+    export LOGNAME=root
+    export SHELL=/bin/sh
+    export PATH=/bin:/usr/bin:/sbin:/usr/sbin
+    export TERM="''${TERM:-linux}"
+    export TERMINFO_DIRS="''${TERMINFO_DIRS:-/lib/terminfo:/usr/share/terminfo:/usr/lib/terminfo}"
 
-        mount -t proc proc /proc || true
-        mount -t sysfs sysfs /sys || true
-        mount -t devtmpfs devtmpfs /dev || true
-        mount -t tmpfs tmpfs /run || true
+    mount -t proc proc /proc || true
+    mount -t sysfs sysfs /sys || true
+    mount -t devtmpfs devtmpfs /dev || true
+    mount -t tmpfs tmpfs /run || true
 
-        mkdir -p /run/wrappers/bin
+    [ -e /dev/null ] || mknod -m 666 /dev/null c 1 3
+    [ -e /dev/zero ] || mknod -m 666 /dev/zero c 1 5
+    [ -e /dev/tty ] || mknod -m 666 /dev/tty c 5 0
+    [ -e /dev/console ] || mknod -m 600 /dev/console c 5 1
 
-        [ -e /dev/null ] || mknod -m 666 /dev/null c 1 3
-        [ -e /dev/zero ] || mknod -m 666 /dev/zero c 1 5
-        [ -e /dev/tty ] || mknod -m 666 /dev/tty c 5 0
-        [ -e /dev/console ] || mknod -m 600 /dev/console c 5 1
+    mkdir -p /run/wrappers/bin
 
-        if [ -e /usr/bin/unix_chkpwd ]; then
-          ln -sf /usr/bin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
-        elif [ -e /usr/sbin/unix_chkpwd ]; then
-          ln -sf /usr/sbin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
-        fi
+    if [ -e /usr/bin/unix_chkpwd ]; then
+      ln -sf /usr/bin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
+    elif [ -e /usr/sbin/unix_chkpwd ]; then
+      ln -sf /usr/sbin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
+    fi
 
-        if [ -f /etc/hostname ]; then
-          /usr/bin/hostname "$(cat /etc/hostname)" || true
-        fi
+    # Load common VM input drivers so graphical console input works even
+    # without udev-based module autoload.
+    for mod in \
+      i8042 \
+      atkbd \
+      psmouse \
+      evdev \
+      xhci_pci \
+      xhci_hcd \
+      usbhid \
+      hid_generic
+    do
+      modprobe "$mod" >/dev/null 2>&1 || true
+    done
 
-        ${lib.optionalString debug ''
-          echo "[busybox-init debug] dropping to shell"
-          /bin/sh -i
-        ''}
+    if [ -f /etc/hostname ]; then
+      /usr/bin/hostname "$(cat /etc/hostname)" || true
+    fi
 
-        exit 0
-      '';
-      mode = "0755";
-    };
+    ${lib.optionalString debug ''
+      echo "[busybox-init debug] dropping to shell"
+      /bin/sh -i
+    ''}
+
+    exit 0
+  '';
+  mode = "0755";
+};
 
     "/etc/login.defs" = {
       text = ''

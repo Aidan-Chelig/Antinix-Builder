@@ -77,6 +77,45 @@ fn rebuild_runtime_dirs(root: &Path, sources: &[String], dest_rel: &str) -> Resu
     let dest_rel = normalize_rel_string(dest_rel);
     let dest_abs = root.join(dest_rel.trim_start_matches('/'));
 
+    // Preserve kernel modules before rebuilding lib/lib64.
+    let preserved_modules: Option<(PathBuf, PathBuf)> = {
+        let modules_abs = dest_abs.join("modules");
+        if modules_abs.exists() {
+            let preserved = root
+                .join("debug/.preserve-modules")
+                .join(dest_rel.trim_start_matches('/').replace('/', "_"));
+
+            if let Some(parent) = preserved.parent() {
+                fs::create_dir_all(parent)
+                    .with_context(|| format!("failed to create {}", parent.display()))?;
+            }
+
+            if preserved.exists() {
+                let meta = fs::symlink_metadata(&preserved)
+                    .with_context(|| format!("failed to stat {}", preserved.display()))?;
+                if meta.file_type().is_dir() && !meta.file_type().is_symlink() {
+                    fs::remove_dir_all(&preserved)
+                        .with_context(|| format!("failed to remove {}", preserved.display()))?;
+                } else {
+                    fs::remove_file(&preserved)
+                        .with_context(|| format!("failed to remove {}", preserved.display()))?;
+                }
+            }
+
+            fs::rename(&modules_abs, &preserved).with_context(|| {
+                format!(
+                    "failed to preserve {} -> {}",
+                    modules_abs.display(),
+                    preserved.display()
+                )
+            })?;
+
+            Some((modules_abs, preserved))
+        } else {
+            None
+        }
+    };
+
     if dest_abs.exists() {
         let meta = fs::symlink_metadata(&dest_abs)
             .with_context(|| format!("failed to stat {}", dest_abs.display()))?;
@@ -111,6 +150,34 @@ fn rebuild_runtime_dirs(root: &Path, sources: &[String], dest_rel: &str) -> Resu
         }
 
         copy_dir_contents_dereference(&src_abs, &dest_abs)?;
+    }
+
+    // Restore preserved kernel modules after rebuilding lib/lib64.
+    if let Some((modules_abs, preserved)) = preserved_modules {
+        if let Some(parent) = modules_abs.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("failed to create {}", parent.display()))?;
+        }
+
+        if modules_abs.exists() {
+            let meta = fs::symlink_metadata(&modules_abs)
+                .with_context(|| format!("failed to stat {}", modules_abs.display()))?;
+            if meta.file_type().is_dir() && !meta.file_type().is_symlink() {
+                fs::remove_dir_all(&modules_abs)
+                    .with_context(|| format!("failed to remove {}", modules_abs.display()))?;
+            } else {
+                fs::remove_file(&modules_abs)
+                    .with_context(|| format!("failed to remove {}", modules_abs.display()))?;
+            }
+        }
+
+        fs::rename(&preserved, &modules_abs).with_context(|| {
+            format!(
+                "failed to restore {} -> {}",
+                preserved.display(),
+                modules_abs.display()
+            )
+        })?;
     }
 
     Ok(())

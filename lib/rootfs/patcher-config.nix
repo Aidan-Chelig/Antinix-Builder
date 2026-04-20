@@ -26,6 +26,13 @@ let
     "/usr/share/fonts/**"
     "/usr/share/man/**"
     "/usr/share/doc/**"
+    "/lib/modules/*"
+    "/usr/lib/modules/*"
+  ];
+
+  defaultIgnorePaths = [
+    "/lib/modules"
+    "/usr/lib/modules"
   ];
 
   defaultIgnoreExtensions = [
@@ -232,6 +239,7 @@ in
         rpath = patch.rpath or null;
       }) (patching.elfPatches or [ ]);
 
+      ignorePaths = mergeUnique defaultIgnorePaths (ignore.paths or [ ]);
       ignoreGlobs = mergeUnique defaultIgnoreGlobs (ignore.globs or [ ]);
 
       ignoreExtensions = mergeUnique defaultIgnoreExtensions (ignore.extensions or [ ]);
@@ -250,6 +258,7 @@ in
       strict_scan_roots = strictScanRoots;
       warn_scan_roots = warnScanRoots;
 
+      ignore_paths = ignorePaths;
       ignore_globs = ignoreGlobs;
       ignore_extensions = ignoreExtensions;
 

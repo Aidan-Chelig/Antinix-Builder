@@ -127,4 +127,9 @@ runCommand "${systemName}-rootfs-tree"
           --allowed-prefixes-file "${closurePathsFile}"
 
         ${lib.concatStringsSep "\n" (spec.postBuild or [ ])}
+
+echo "=== post-process modules check ==="
+find "$out/lib/modules" -maxdepth 2 -print 2>&1 || true
+find "$out/usr/lib/modules" -maxdepth 2 -print 2>&1 || true
+ls -ld "$out/lib" "$out/usr/lib" 2>&1 || true
   ''

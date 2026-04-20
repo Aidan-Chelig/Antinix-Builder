@@ -108,20 +108,8 @@ runCommand "${name}-rootfs.tar.gz"
 
         mkdir root
 
-        cp -a "${rootfs}/." root/
+        cp -aT "${rootfs}" root
         chmod -R u+w root 2>/dev/null || true
-
-    echo "=== tarball input rootfs ==="
-    ls -l "${rootfs}/sbin/init" || true
-    readlink "${rootfs}/sbin/init" || true
-    ls -l "${rootfs}/usr/bin/busybox" || true
-    ls -l "${rootfs}/bin/busybox" || true
-
-    echo "=== tarball staging tree after cp ==="
-    ls -l root/sbin/init || true
-    readlink root/sbin/init || true
-    ls -l root/usr/bin/busybox || true
-    ls -l root/bin/busybox || true
 
         fakeroot -- sh -eu -c '
           chown -R 0:0 root
