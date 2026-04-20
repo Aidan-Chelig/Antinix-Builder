@@ -139,10 +139,10 @@ let
       { };
 
   kernelAllowedStorePrefixes =
-    if effectiveModulesTree != null then
-      [ (toString effectiveModulesTree) ]
-    else
-      [ ];
+    lib.unique (
+      lib.optional (effectiveModulesTree != null) (toString effectiveModulesTree)
+      ++ lib.optional (effectiveKernel != null) (toString effectiveKernel)
+    );
 
   effectivePatching =
     patching
