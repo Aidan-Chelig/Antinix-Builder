@@ -31,7 +31,6 @@ pkgs.runCommand "antinix-api-reference.md"
     chmod -R u+w repo
 
     cd repo
-
 ${pkgs.python3}/bin/python ${./../tools/generate-api-docs.py} \
   --title "Antinix API Reference" \
   --output "$out/API.md" \

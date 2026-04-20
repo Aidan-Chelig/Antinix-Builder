@@ -30,8 +30,9 @@ def parse_file(path: pathlib.Path, display_source: str) -> List[Entry]:
 
     for raw_line in path.read_text(encoding="utf-8").splitlines():
         line = raw_line.rstrip("\n")
-        if line.startswith("##@"):
-            current.append(line[3:].strip())
+        stripped = line.lstrip()
+        if stripped.startswith("##@"):
+            current.append(stripped[3:].strip())
             continue
 
         if current:

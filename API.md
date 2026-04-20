@@ -11,6 +11,74 @@ Top-level Antinix library exposing system builders and helpers.
 
 - attrset containing mkSystem, mkInitrd, mkRunVm, schema, and utilities.
 
+## mkDirectory
+
+Define a directory in the rootfs.
+
+- **Kind:** `helper`
+- **Source:** `lib/fragments/schema.nix`
+
+### Parameters
+
+- `mode` *string?* — Directory mode.
+- `user` *string* — Owner user.
+- `group` *string* — Owner group.
+
+### Returns
+
+- attrset describing a directory.
+
+## mkFile
+
+Define a file in the rootfs.
+
+- **Kind:** `helper`
+- **Source:** `lib/fragments/schema.nix`
+
+### Parameters
+
+- `source` *path?* — Source file to copy.
+- `text` *string?* — Inline file contents.
+- `mode` *string?* — File mode (e.g. "0644").
+- `user` *string* — Owner user.
+- `group` *string* — Owner group.
+
+### Returns
+
+- attrset describing a file entry.
+
+## mkGroup
+
+Define a system group.
+
+- **Kind:** `helper`
+- **Source:** `lib/fragments/schema.nix`
+
+### Parameters
+
+- `gid` *int?* — Group ID.
+
+### Returns
+
+- attrset describing a group.
+
+## mkImport
+
+Import an existing filesystem tree into the rootfs.
+
+- **Kind:** `helper`
+- **Source:** `lib/fragments/schema.nix`
+
+### Parameters
+
+- `source` *path* — Source directory to copy.
+- `user` *string* — Owner user.
+- `group` *string* — Owner group.
+
+### Returns
+
+- attrset describing an import.
+
 ## mkInitrd
 
 Build a dracut initrd for a kernel or nixosSystem.
@@ -101,3 +169,24 @@ antinixLib.mkSystem {
   nixosSystem = kernelSystem;
 }
 ```
+
+## mkUser
+
+Define a system user.
+
+- **Kind:** `helper`
+- **Source:** `lib/fragments/schema.nix`
+
+### Parameters
+
+- `uid` *int?* — User ID.
+- `group` *string?* — Primary group.
+- `extraGroups` *list* — Supplementary groups.
+- `home` *string* — Home directory.
+- `shell` *string* — Login shell.
+- `hashedPassword` *string* — Pre-hashed password.
+- `isNormalUser` *bool* — Whether user is a normal account.
+
+### Returns
+
+- attrset describing a user.
