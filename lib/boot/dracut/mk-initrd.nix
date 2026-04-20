@@ -387,7 +387,7 @@ EOF
       --verbose \
       ${lib.optionalString (!hostonly) "--no-hostonly \\"}
       --kver "${effectiveKernelVersion}" \
-      --kmoddir "${effectiveModuleTree}/lib/modules/${effectiveKernelVersion}" \
+      --kmoddir "$MODULES_DIR" \
       --include "$PWD/overlay" / \
       --conf /dev/null \
       --confdir "$PWD/etc/dracut.conf.d" \
