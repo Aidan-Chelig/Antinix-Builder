@@ -1,4 +1,4 @@
-{ lib, pkgs, schema }:
+{ lib, pkgs, schema, merge }:
 
 let
   dbusSessionConfig = ''
@@ -23,7 +23,7 @@ let
     </busconfig>
   '';
 in
-{
+rec {
   ##@ name: udev
   ##@ path: lib.profiles.runtime.udev
   ##@ kind: function
@@ -62,6 +62,58 @@ in
       };
     };
 
+  ##@ name: dbusSession
+  ##@ path: lib.profiles.runtime.dbusSession
+  ##@ kind: function
+  ##@ summary: Add DBus runtime package support and session/system bus config files.
+  ##@ returns: Fragment that installs DBus and writes the runtime configuration files needed for dbus-run-session.
+  ##@ example: antinixLib.profiles.runtime.dbusSession { }
+  dbusSession =
+    { }:
+    {
+      packages = [ pkgs.dbus ];
+
+      files."/etc/dbus-1/session.conf" = schema.mkFile {
+        text = dbusSessionConfig;
+        mode = "0644";
+      };
+
+      files."/etc/dbus-1/system.conf" = schema.mkFile {
+        source = "${pkgs.dbus}/share/dbus-1/system.conf";
+        mode = "0644";
+      };
+    };
+
+  ##@ name: fontconfig
+  ##@ path: lib.profiles.runtime.fontconfig
+  ##@ kind: function
+  ##@ summary: Add fontconfig package support and import /etc/fonts into the rootfs.
+  ##@ returns: Fragment that installs fontconfig and imports its system configuration tree.
+  ##@ example: antinixLib.profiles.runtime.fontconfig { }
+  fontconfig =
+    { }:
+    {
+      packages = [ pkgs.fontconfig ];
+
+      imports."/etc/fonts" = schema.mkImport {
+        source = "${pkgs.fontconfig.out}/etc/fonts";
+      };
+    };
+
+  ##@ name: xkb
+  ##@ path: lib.profiles.runtime.xkb
+  ##@ kind: function
+  ##@ summary: Add xkeyboard-config and create the legacy /etc/X11/xkb compatibility path.
+  ##@ returns: Fragment that installs xkeyboard-config and links /etc/X11/xkb to /usr/share/X11/xkb.
+  ##@ example: antinixLib.profiles.runtime.xkb { }
+  xkb =
+    { }:
+    {
+      packages = [ pkgs.xkeyboard_config ];
+
+      symlinks."/etc/X11/xkb" = "/usr/share/X11/xkb";
+    };
+
   ##@ name: graphicalBase
   ##@ path: lib.profiles.runtime.graphicalBase
   ##@ kind: function
@@ -77,33 +129,9 @@ in
       enableFontconfig ? true,
       enableXkb ? true,
     }:
-    {
-      packages =
-        lib.optionals enableDbus [ pkgs.dbus ]
-        ++ lib.optionals enableFontconfig [ pkgs.fontconfig ]
-        ++ lib.optionals enableXkb [ pkgs.xkeyboard_config ];
-
-      imports = lib.optionalAttrs enableFontconfig {
-        "/etc/fonts" = schema.mkImport {
-          source = "${pkgs.fontconfig.out}/etc/fonts";
-        };
-      };
-
-      files =
-        lib.optionalAttrs enableDbus {
-          "/etc/dbus-1/session.conf" = schema.mkFile {
-            text = dbusSessionConfig;
-            mode = "0644";
-          };
-
-          "/etc/dbus-1/system.conf" = schema.mkFile {
-            source = "${pkgs.dbus}/share/dbus-1/system.conf";
-            mode = "0644";
-          };
-        };
-
-      symlinks = lib.optionalAttrs enableXkb {
-        "/etc/X11/xkb" = "/usr/share/X11/xkb";
-      };
-    };
+    merge.mergeMany (
+      lib.optional enableDbus (dbusSession { })
+      ++ lib.optional enableFontconfig (fontconfig { })
+      ++ lib.optional enableXkb (xkb { })
+    );
 }

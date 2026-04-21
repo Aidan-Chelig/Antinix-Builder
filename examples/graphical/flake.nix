@@ -58,8 +58,49 @@
         packageManager = "none";
         console = "ttyS0";
         fragments = [
-          (antinixLib.profiles.graphical.labwcVm {
+          (antinixLib.profiles.runtime.udev {
+            descriptionPrefix = "Graphical example";
+          })
+          (antinixLib.profiles.runtime.dbusSession { })
+          (antinixLib.profiles.runtime.fontconfig { })
+          (antinixLib.profiles.runtime.xkb { })
+          (antinixLib.profiles.graphical.seatd {
             user = "root";
+            group = "root";
+          })
+          (antinixLib.profiles.sessions.runtimeDir {
+            user = "root";
+            group = "root";
+            extraDirectories = [
+              "/root/.cache"
+              "/root/.cache/fontconfig"
+            ];
+          })
+          (antinixLib.profiles.sessions.profileLauncher {
+            user = "root";
+            tty = "tty1";
+            command = [ "/usr/bin/labwc" ];
+            dbusSession = true;
+            environment =
+              {
+                XDG_SESSION_TYPE = "wayland";
+                XDG_CURRENT_DESKTOP = "labwc";
+                XDG_CACHE_HOME = "/root/.cache";
+                FONTCONFIG_PATH = "/etc/fonts";
+                FONTCONFIG_FILE = "/etc/fonts/fonts.conf";
+                XKB_CONFIG_ROOT = "/usr/share/X11/xkb";
+              }
+              // (antinixLib.profiles.graphical.wlrootsVmCompat {
+                softwareRendering = true;
+                softwareCursor = true;
+              });
+          })
+          (antinixLib.profiles.sessions.ttyAutologin {
+            user = "root";
+            tty = "tty1";
+          })
+          (antinixLib.profiles.graphical.labwc {
+            terminal = "/usr/bin/foot";
           })
         ];
         vmConsole.serialGetty.enable = false;

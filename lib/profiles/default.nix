@@ -6,11 +6,11 @@
 
 let
   runtime = pkgs.callPackage ./runtime.nix {
-    inherit schema;
+    inherit schema merge;
   };
 
   sessions = pkgs.callPackage ./sessions.nix {
-    inherit schema;
+    inherit schema merge;
   };
 in
 {
@@ -19,7 +19,14 @@ in
   ##@ kind: module
   ##@ summary: Reusable runtime fragments such as udev and graphical base config.
   ##@ returns: Attrset exposing runtime-oriented profile helpers.
-  inherit runtime sessions;
+  runtime = runtime;
+
+  ##@ name: sessions
+  ##@ path: lib.profiles.sessions
+  ##@ kind: module
+  ##@ summary: Reusable session fragments for runtime directories, tty autologin, and shell launch hooks.
+  ##@ returns: Attrset exposing session-oriented profile helpers.
+  sessions = sessions;
 
   ##@ name: graphical
   ##@ path: lib.profiles.graphical
