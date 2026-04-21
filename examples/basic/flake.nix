@@ -56,6 +56,13 @@
         init = "openrc";
         packageManager = "xbps";
         console = "ttyS0";
+        fragments = [
+          (antinixLib.profiles.vm.qemuGuest {
+            graphics = true;
+            enableUdev = true;
+            descriptionPrefix = "Basic example";
+          })
+        ];
 
         nixosSystem = kernelSystem;
         buildImage = true;

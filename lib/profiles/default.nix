@@ -12,6 +12,13 @@ let
   sessions = pkgs.callPackage ./sessions.nix {
     inherit schema merge;
   };
+
+  vm = pkgs.callPackage ./vm.nix {
+    inherit
+      merge
+      runtime
+      ;
+  };
 in
 {
   ##@ name: runtime
@@ -41,4 +48,11 @@ in
       sessions
       ;
   };
+
+  ##@ name: vm
+  ##@ path: lib.profiles.vm
+  ##@ kind: module
+  ##@ summary: Guest-side virtualization profiles for QEMU-oriented system defaults.
+  ##@ returns: Attrset exposing VM-oriented profile helpers such as qemuGuest.
+  vm = vm;
 }

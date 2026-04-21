@@ -58,7 +58,10 @@
         packageManager = "none";
         console = "ttyS0";
         fragments = [
-          (antinixLib.profiles.runtime.udev {
+          (antinixLib.profiles.vm.qemuGuest {
+            graphics = true;
+            serialConsole = false;
+            enableUdev = true;
             descriptionPrefix = "Graphical example";
           })
           (antinixLib.profiles.runtime.dbusSession { })
@@ -103,7 +106,6 @@
             terminal = "/usr/bin/foot";
           })
         ];
-        vmConsole.serialGetty.enable = false;
 
         nixosSystem = kernelSystem;
         buildImage = true;

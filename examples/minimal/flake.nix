@@ -45,11 +45,12 @@
         init = "busybox";
         packageManager = "none";
         console = "ttyS0";
-        vmConsole = {
-          graphicalGetty.enable = false;
-          switchToGraphicalVt.enable = false;
-          loadInputModules.enable = false;
-        };
+        fragments = [
+          (antinixLib.profiles.vm.qemuGuest {
+            graphics = false;
+            enableUdev = false;
+          })
+        ];
 
         nixosSystem = kernelSystem;
         buildImage = true;

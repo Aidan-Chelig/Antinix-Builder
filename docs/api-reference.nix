@@ -14,6 +14,7 @@ let
     "lib/profiles/runtime.nix"
     "lib/profiles/sessions.nix"
     "lib/profiles/graphical.nix"
+    "lib/profiles/vm.nix"
   ];
 
   docSourceArgs =
