@@ -10,6 +10,10 @@ let
     "lib/boot/dracut/mk-initrd.nix"
     "lib/boot/vm/mk-run-vm.nix"
     "lib/fragments/schema.nix"
+    "lib/profiles/default.nix"
+    "lib/profiles/runtime.nix"
+    "lib/profiles/sessions.nix"
+    "lib/profiles/graphical.nix"
   ];
 
   docSourceArgs =

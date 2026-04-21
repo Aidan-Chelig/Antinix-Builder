@@ -224,8 +224,26 @@ let
     else
       fragment;
 
-  initFragment = realizeFragment (getInitFragment init);
-  packageManagerFragment = realizeFragment (getPackageManagerFragment packageManager);
+  realizedUserFragments = map realizeFragment fragments;
+
+  effectiveVmConsole =
+    (merge.mergeMany (realizedUserFragments ++ [ { vmConsole = vmConsole; } ])).vmConsole or vmConsole;
+
+  effectiveFragmentContext = {
+    hostname = hostname;
+    console = console;
+    vmConsole = effectiveVmConsole;
+  };
+
+  realizeCoreFragment =
+    fragment:
+    if isCallableFragment fragment then
+      fragment (builtins.intersectAttrs (fragmentFunctionArgs fragment) effectiveFragmentContext)
+    else
+      fragment;
+
+  initFragment = realizeCoreFragment (getInitFragment init);
+  packageManagerFragment = realizeCoreFragment (getPackageManagerFragment packageManager);
 
   effectiveDebug = {
     tracePhases = debug.tracePhases or false;
@@ -274,7 +292,7 @@ let
       initFragment
       packageManagerFragment
     ]
-    ++ fragments
+    ++ realizedUserFragments
     ++ [ userBaseFragment ]
   );
 

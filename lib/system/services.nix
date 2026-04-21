@@ -14,7 +14,10 @@ let
     "init"
   ];
 
-  supportedWantedBy = [ "default" ];
+  supportedWantedBy = [
+    "default"
+    "boot"
+  ];
   supportedInitNames = [
     "busybox"
     "dinit"
@@ -252,6 +255,9 @@ let
       symlinks =
         lib.optionalAttrs (builtins.elem "default" service.wantedBy) {
           "/etc/runlevels/default/${name}" = "/etc/init.d/${name}";
+        }
+        // lib.optionalAttrs (builtins.elem "boot" service.wantedBy) {
+          "/etc/runlevels/boot/${name}" = "/etc/init.d/${name}";
         };
     in
     forceChecks [
@@ -280,6 +286,11 @@ let
           throw "services.${name}.oneShot is not yet supported for init=runit"
         else
           null;
+      _wantedBy =
+        if builtins.elem "boot" service.wantedBy then
+          throw "services.${name}.wantedBy=boot is not yet supported for init=runit"
+        else
+          null;
       symlinks =
         lib.optionalAttrs (builtins.elem "default" service.wantedBy) {
           "/etc/service/${name}" = "/etc/sv/${name}";
@@ -289,6 +300,7 @@ let
       _runAs
       _depends
       _oneShot
+      _wantedBy
     ] {
       files = builtins.listToAttrs [ (mkRunitRunFile name service) ];
       symlinks = symlinks;
@@ -315,6 +327,11 @@ let
           null
         else
           throw "services.${name}.restart=${service.restart} is not yet supported for init=dinit";
+      _wantedBy =
+        if builtins.elem "boot" service.wantedBy then
+          throw "services.${name}.wantedBy=boot is not yet supported for init=dinit"
+        else
+          null;
       depLines = lib.concatMapStringsSep "\n" (dep: "depends-on = ${dep}") service.dependsOn;
       files = builtins.listToAttrs [
         (mkWrapperFile name service)
@@ -344,6 +361,7 @@ let
       _runAs
       _oneShot
       _restart
+      _wantedBy
     ] {
       inherit files symlinks directories;
     };
@@ -371,6 +389,11 @@ let
           null
         else
           throw "services.${name}.restart=${service.restart} is not yet supported for init=s6";
+      _wantedBy =
+        if builtins.elem "boot" service.wantedBy then
+          throw "services.${name}.wantedBy=boot is not yet supported for init=s6"
+        else
+          null;
       files = builtins.listToAttrs [
         {
           name = "/etc/s6/sv/${name}/run";
@@ -410,6 +433,7 @@ let
       _depends
       _oneShot
       _restart
+      _wantedBy
     ] {
       inherit files symlinks directories;
     };

@@ -14,6 +14,8 @@
 ##@ param: cpus int? Number of virtual CPUs.
 ##@ param: graphics bool? Enable graphical output and input devices.
 ##@ param: serialConsole bool? Attach the serial console to stdio.
+##@ param: graphicsProfile string? Graphics device preset. Supports "default" and "none".
+##@ param: inputProfile string? Input device preset. Supports "default" and "none".
 ##@ param: machine string? Override the QEMU machine type.
 ##@ param: kernelParams list Extra kernel command line parameters.
 ##@ param: extraDevices list Extra QEMU -device arguments.
@@ -35,6 +37,8 @@
 
   graphics ? true,
   serialConsole ? true,
+  graphicsProfile ? "default",
+  inputProfile ? "default",
   machine ? null,
 
   kernelParams ? [ ],
@@ -128,27 +132,43 @@ let
     else
       "gtk";
 
-graphicsArgs =
-    if graphics then
+  graphicsDeviceArgs =
+    if !graphics || graphicsProfile == "none" then
+      [ ]
+    else if graphicsProfile == "default" then
       if guestSystem == "x86_64-linux" then
         [
-          "-display" displayBackend
           "-vga" "none"
           "-device" "virtio-gpu-pci"
-          "-device" "qemu-xhci"
-          "-device" "usb-kbd"
-          "-device" "usb-tablet"
         ]
       else if guestSystem == "aarch64-linux" then
         [
-          "-display" displayBackend
           "-device" "virtio-gpu-pci"
-          "-device" "qemu-xhci"
-          "-device" "usb-kbd"
-          "-device" "usb-tablet"
         ]
       else
         [ ]
+    else
+      throw "mkRunVm: unsupported graphicsProfile ${graphicsProfile}";
+
+  inputDeviceArgs =
+    if !graphics || inputProfile == "none" then
+      [ ]
+    else if inputProfile == "default" then
+      [
+        "-device" "qemu-xhci"
+        "-device" "usb-kbd"
+        "-device" "usb-tablet"
+      ]
+    else
+      throw "mkRunVm: unsupported inputProfile ${inputProfile}";
+
+  graphicsArgs =
+    if graphics then
+      [
+        "-display" displayBackend
+      ]
+      ++ graphicsDeviceArgs
+      ++ inputDeviceArgs
     else
       [
         "-display" "none"

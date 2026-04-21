@@ -147,6 +147,13 @@ let
     ''
       export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${"$"}{PATH:+:${"$"}PATH}"
       export HOSTNAME=${lib.escapeShellArg hostname}
+
+      if [ -d /etc/profile.d ]; then
+        for profile_script in /etc/profile.d/*.sh; do
+          [ -r "$profile_script" ] || continue
+          . "$profile_script"
+        done
+      fi
     ''
     + lib.optionalString (extraText != "") ("\n${extraText}\n");
 

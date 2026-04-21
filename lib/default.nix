@@ -28,6 +28,13 @@ packageManagers = guestPkgs.callPackage ./fragments/package-managers/default.nix
 
 rootfsPatcher = linuxBuildPkgs.callPackage ../pkgs/rootfs-patcher.nix { };
 
+  profiles = guestPkgs.callPackage ./profiles/default.nix {
+    inherit
+      schema
+      merge
+      ;
+  };
+
   mkRootfsTree = linuxBuildPkgs.callPackage ./rootfs/mk-rootfs-tree.nix {
     buildEnv = linuxBuildPkgs.buildEnv;
     runCommand = linuxBuildPkgs.runCommand;
@@ -182,6 +189,13 @@ in
   ##@ summary: Consumer-facing schema helpers.
   ##@ returns: attrset exposing mkFile, mkDirectory, mkImport, mkUser, mkGroup, and mkService.
   schema = schema;
+
+  ##@ name: profiles
+  ##@ path: lib.profiles
+  ##@ kind: module
+  ##@ summary: Reusable system fragments for common runtime and session setups.
+  ##@ returns: Attrset exposing runtime, sessions, and graphical profile helpers.
+  profiles = profiles;
 
   ##@ name: initSystems
   ##@ path: lib.initSystems

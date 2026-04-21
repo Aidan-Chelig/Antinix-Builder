@@ -217,7 +217,7 @@ let
   ##@ param: command list Command and arguments to execute.
   ##@ param: environment attrset Environment variables exported before exec.
   ##@ param: dependsOn list Other service names required before startup.
-  ##@ param: wantedBy list Activation targets. Currently supports "default".
+  ##@ param: wantedBy list Activation targets. Currently supports "default" and "boot" (OpenRC only for "boot").
   ##@ param: runAs string Runtime user. Root-only in the current implementation.
   ##@ param: oneShot bool Whether the service should run once and exit.
   ##@ param: restart string Restart policy: none, on-failure, or always.
