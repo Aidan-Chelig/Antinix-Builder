@@ -34,19 +34,30 @@ pub fn normalize_embedded_store_path(root: &Path, s: &str) -> Option<String> {
         return None;
     }
 
-    let suffix = store_suffix_after_package(s)?;
+    let (store_basename, suffix) = split_store_path(s)?;
 
-    let candidate = map_runtime_suffix_to_fhs(&suffix)?;
-    let abs = root.join(candidate.trim_start_matches('/'));
+    if let Some(candidate) = map_runtime_suffix_to_fhs(&suffix) {
+        let abs = root.join(candidate.trim_start_matches('/'));
+        if abs.exists() {
+            return Some(candidate);
+        }
+    }
 
-    if abs.exists() { Some(candidate) } else { None }
+    let opaque_candidate = format!("/usr/lib/antinix/store/{store_basename}{suffix}");
+    let opaque_abs = root.join(opaque_candidate.trim_start_matches('/'));
+    if opaque_abs.exists() {
+        Some(opaque_candidate)
+    } else {
+        None
+    }
 }
 
-fn store_suffix_after_package(s: &str) -> Option<String> {
+fn split_store_path(s: &str) -> Option<(String, String)> {
     let rest = s.strip_prefix(STORE_REF)?;
-    let slash = rest.find('/')?;
-    let suffix = &rest[slash..]; // starts with "/share/..." or "/lib/..."
-    Some(suffix.to_string())
+    match rest.find('/') {
+        Some(slash) => Some((rest[..slash].to_string(), rest[slash..].to_string())),
+        None => Some((rest.to_string(), String::new())),
+    }
 }
 
 fn map_runtime_suffix_to_fhs(suffix: &str) -> Option<String> {

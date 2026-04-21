@@ -3,6 +3,9 @@ use rayon::prelude::*;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+const RUNTIME_CATEGORY_ROOTS: [&str; 6] = ["bin", "sbin", "lib", "lib64", "libexec", "share"];
+const OPAQUE_STORE_DEST_ROOT: &str = "usr/lib/antinix/store";
+
 pub fn merge_closure_into_root(
     root: &Path,
     closure_paths_file: &Path,
@@ -23,10 +26,15 @@ pub fn merge_closure_into_root(
     merge_category(&sources, root, "sbin", Path::new("usr/sbin"))?;
     merge_category(&sources, root, "lib", Path::new("usr/lib"))?;
     merge_category(&sources, root, "lib64", Path::new("usr/lib64"))?;
+    merge_category(&sources, root, "libexec", Path::new("usr/libexec"))?;
 
     for rel in data_dirs {
         let dest = map_data_dir_dest(rel);
         merge_category(&sources, root, rel, Path::new(dest.trim_start_matches('/')))?;
+    }
+
+    for src_root in &sources {
+        materialize_opaque_runtime_root(src_root, root)?;
     }
 
     // Convenience mirrors like the old shell did.
@@ -48,6 +56,53 @@ pub fn merge_closure_into_root(
         }
     }
 
+    Ok(())
+}
+
+fn materialize_opaque_runtime_root(src_root: &Path, root: &Path) -> Result<()> {
+    if !src_root.is_dir() {
+        return Ok(());
+    }
+
+    let entries: Vec<PathBuf> = fs::read_dir(src_root)
+        .with_context(|| format!("failed to read directory {}", src_root.display()))?
+        .map(|e| {
+            e.map(|x| x.path())
+                .with_context(|| format!("failed reading entry in {}", src_root.display()))
+        })
+        .collect::<Result<_>>()?;
+
+    if entries.is_empty() {
+        return Ok(());
+    }
+
+    let has_runtime_category = entries.iter().any(|entry| {
+        entry.file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| RUNTIME_CATEGORY_ROOTS.contains(&name))
+            .unwrap_or(false)
+    });
+
+    if has_runtime_category {
+        return Ok(());
+    }
+
+    let Some(base_name) = src_root.file_name() else {
+        return Ok(());
+    };
+
+    let dest = root.join(OPAQUE_STORE_DEST_ROOT).join(base_name);
+    if dest.exists() {
+        let meta = fs::symlink_metadata(&dest)
+            .with_context(|| format!("failed to stat {}", dest.display()))?;
+        if meta.file_type().is_dir() && !meta.file_type().is_symlink() {
+            merge_dir_contents(src_root, &dest)?;
+        }
+        return Ok(());
+    }
+
+    copy_entry_dereference(src_root, &dest)?;
+    make_dirs_writable_recursive(&dest)?;
     Ok(())
 }
 

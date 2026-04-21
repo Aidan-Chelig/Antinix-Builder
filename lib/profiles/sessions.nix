@@ -9,19 +9,8 @@ let
       [ "/" " " ":" "@" ]
       [ "-" "-" "-" "-" ]
       (builtins.toString value);
-in
-rec {
-  ##@ name: runtimeDir
-  ##@ path: lib.profiles.sessions.runtimeDir
-  ##@ kind: function
-  ##@ summary: Create a boot-time service that prepares a runtime directory and optional extra directories for a user session.
-  ##@ param: user string User owning the runtime directory.
-  ##@ param: group string? Group owning the runtime directory.
-  ##@ param: runtimeDir string? Runtime directory path; defaults to /run/user/<uid-ish>.
-  ##@ param: extraDirectories list? Additional directories to create and chown alongside the runtime directory.
-  ##@ returns: Fragment that adds a boot service for runtime directory preparation.
-  ##@ example: antinixLib.profiles.sessions.runtimeDir { user = "root"; }
-  runtimeDir =
+
+  runtimeDirProfile =
     {
       user,
       group ? if user == "root" then "root" else user,
@@ -55,6 +44,20 @@ rec {
         };
       };
     };
+in
+rec {
+  ##@ name: runtimeDir
+  ##@ path: lib.profiles.sessions.runtimeDir
+  ##@ kind: function
+  ##@ summary: Create a boot-time service that prepares a runtime directory and optional extra directories for a user session.
+  ##@ param: user string User owning the runtime directory.
+  ##@ param: group string? Group owning the runtime directory.
+  ##@ param: runtimeDir string? Runtime directory path; defaults to /run/user/<uid-ish>.
+  ##@ param: extraDirectories list? Additional directories to create and chown alongside the runtime directory.
+  ##@ returns: Fragment that adds a boot service for runtime directory preparation.
+  ##@ example: antinixLib.profiles.sessions.runtimeDir { user = "root"; }
+  runtimeDir =
+    runtimeDirProfile;
 
   ##@ name: profileLauncher
   ##@ path: lib.profiles.sessions.profileLauncher
@@ -174,7 +177,7 @@ rec {
       extraDirectories ? [ ],
     }:
     merge.mergeMany [
-      (runtimeDir {
+      (runtimeDirProfile {
         inherit user group;
         inherit runtimeDir;
         extraDirectories = extraDirectories;

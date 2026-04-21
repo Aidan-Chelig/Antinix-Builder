@@ -64,58 +64,24 @@
             enableUdev = true;
             descriptionPrefix = "Graphical example";
           })
-          (antinixLib.profiles.runtime.dbusSession { })
-          (antinixLib.profiles.runtime.fontconfig { })
-          (antinixLib.profiles.runtime.xkb { })
-          (antinixLib.profiles.graphical.seatd {
+          (antinixLib.profiles.graphical.labwcVm {
             user = "root";
-            group = "root";
-          })
-          (antinixLib.profiles.sessions.runtimeDir {
-            user = "root";
-            group = "root";
-            extraDirectories = [
-              "/root/.cache"
-              "/root/.cache/fontconfig"
+            tty = "tty1";
+            extraSessionEnv = {
+              LANG = "C.UTF-8";
+              LC_CTYPE = "C.UTF-8";
+            };
+            extraPackages = [
+              pkgs.dejavu_fonts
+              pkgs.wmenu
+              pkgs.superTuxKart
             ];
-          })
-          (antinixLib.profiles.sessions.profileLauncher {
-            user = "root";
-            tty = "tty1";
-            command = [ "/usr/bin/labwc" ];
-            dbusSession = true;
-            environment =
-              {
-                LANG = "C.UTF-8";
-                LC_CTYPE = "C.UTF-8";
-                XDG_SESSION_TYPE = "wayland";
-                XDG_CURRENT_DESKTOP = "labwc";
-                XDG_CACHE_HOME = "/root/.cache";
-                FONTCONFIG_PATH = "/etc/fonts";
-                FONTCONFIG_FILE = "/etc/fonts/fonts.conf";
-                XKB_CONFIG_ROOT = "/usr/share/X11/xkb";
-              }
-              // (antinixLib.profiles.graphical.wlrootsVmCompat {
-                softwareRendering = true;
-                softwareCursor = true;
-              });
-          })
-          (antinixLib.profiles.sessions.ttyAutologin {
-            user = "root";
-            tty = "tty1";
-          })
-          (antinixLib.profiles.graphical.labwc {
-            terminal = "/usr/bin/foot";
           })
         ];
 
         nixosSystem = kernelSystem;
         buildImage = true;
-
-        packages = [
-          pkgs.dejavu_fonts
-          pkgs.wmenu
-        ];
+        imageSize = "4G";
 
         groups.root = antinixLib.schema.mkGroup { gid = 0; };
 

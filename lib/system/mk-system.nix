@@ -110,6 +110,7 @@ in
 ##@ param: boot attrset? Boot artifact metadata merged into `meta.boot`, typically provided by boot profiles such as `lib.profiles.boot.grubEfi`.
 ##@ param: buildTarball bool? Build a tarball artifact.
 ##@ param: buildImage bool? Build an image artifact.
+##@ param: imageSize string? Optional size passed to the ext4 rootfs image builder, such as "4G".
 ##@ param: buildBootImage bool? Build a raw UEFI bootable disk image using the configured boot metadata, kernel image, and initrd.
 ##@ param: kernelImage path? Kernel image copied into the EFI partition when `buildBootImage = true`.
 ##@ param: initrd path? Initrd copied into the EFI partition when `buildBootImage = true`.
@@ -151,6 +152,7 @@ args@{
 
   buildTarball ? false,
   buildImage ? false,
+  imageSize ? null,
   buildBootImage ? false,
   kernelImage ? null,
   initrd ? null,
@@ -352,6 +354,7 @@ let
             };
         name = systemName;
         volumeLabel = systemName;
+        inherit imageSize;
         debug = normalizedSpec.debug or { };
       }
     else
@@ -380,6 +383,7 @@ let
                   };
               name = systemName;
               volumeLabel = systemName;
+              inherit imageSize;
               debug = normalizedSpec.debug or { };
             };
       in
