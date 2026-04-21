@@ -185,7 +185,7 @@ nix run
 
 ## Bootable Images
 
-`lib.mkSystem` can now build two different disk-oriented artifacts:
+`lib.mkSystem` can build two different disk-oriented artifacts:
 
 * `image`: a raw ext4 root filesystem image
 * `bootImage`: a raw UEFI bootable disk image with:
