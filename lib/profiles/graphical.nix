@@ -68,6 +68,7 @@ rec {
   ##@ summary: Add the Labwc compositor package and optional Labwc autostart configuration.
   ##@ param: terminal string? Terminal command launched from Labwc autostart.
   ##@ param: terminalPackage derivation? Package added to the closure for the configured terminal command.
+  ##@ param: terminalConfig string? Optional terminal-specific config written for the configured terminal.
   ##@ param: enableXwayland bool? Include Xwayland in the closure.
   ##@ param: extraPackages list? Additional packages included alongside Labwc.
   ##@ returns: Fragment that installs Labwc and optional autostart helpers.
@@ -76,9 +77,22 @@ rec {
     {
       terminal ? null,
       terminalPackage ? if terminal != null then pkgs.foot else null,
+      terminalConfig ? null,
       enableXwayland ? true,
       extraPackages ? [ ],
     }:
+    let
+      effectiveTerminalConfig =
+        if terminalConfig != null then
+          terminalConfig
+        else if terminal == "/usr/bin/foot" then
+          ''
+            [main]
+            font=DejaVu Sans Mono:size=11
+          ''
+        else
+          null;
+    in
     {
       packages =
         [ pkgs.labwc ]
@@ -86,15 +100,22 @@ rec {
         ++ lib.optionals enableXwayland [ pkgs.xwayland ]
         ++ extraPackages;
 
-      files = lib.optionalAttrs (terminal != null) {
-        "/etc/xdg/labwc/autostart" = schema.mkFile {
-          text = ''
-            #!/bin/sh
-            ${terminal} &
-          '';
-          mode = "0755";
+      files =
+        lib.optionalAttrs (terminal != null) {
+          "/etc/xdg/labwc/autostart" = schema.mkFile {
+            text = ''
+              #!/bin/sh
+              ${terminal} &
+            '';
+            mode = "0755";
+          };
+        }
+        // lib.optionalAttrs (effectiveTerminalConfig != null && terminal == "/usr/bin/foot") {
+          "/etc/xdg/foot/foot.ini" = schema.mkFile {
+            text = effectiveTerminalConfig;
+            mode = "0644";
+          };
         };
-      };
     };
 
   ##@ name: labwcVm

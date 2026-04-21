@@ -86,6 +86,8 @@
             dbusSession = true;
             environment =
               {
+                LANG = "C.UTF-8";
+                LC_CTYPE = "C.UTF-8";
                 XDG_SESSION_TYPE = "wayland";
                 XDG_CURRENT_DESKTOP = "labwc";
                 XDG_CACHE_HOME = "/root/.cache";
