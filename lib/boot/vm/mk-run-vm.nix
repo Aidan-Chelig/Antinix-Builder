@@ -76,6 +76,8 @@ let
   baseKernelParams =
     if guestSystem == "x86_64-linux" then
       [
+        "quiet"
+        "loglevel=3"
         "console=ttyS0"
         "console=tty0"
         "root=/dev/vda"
@@ -93,6 +95,8 @@ let
       ]
     else if guestSystem == "aarch64-linux" then
       [
+        "quiet"
+        "loglevel=3"
         "console=ttyAMA0"
         "console=tty0"
         "root=/dev/vda"
@@ -129,7 +133,11 @@ graphicsArgs =
       if guestSystem == "x86_64-linux" then
         [
           "-display" displayBackend
+          "-vga" "none"
           "-device" "virtio-gpu-pci"
+          "-device" "qemu-xhci"
+          "-device" "usb-kbd"
+          "-device" "usb-tablet"
         ]
       else if guestSystem == "aarch64-linux" then
         [
@@ -137,7 +145,7 @@ graphicsArgs =
           "-device" "virtio-gpu-pci"
           "-device" "qemu-xhci"
           "-device" "usb-kbd"
-          "-device" "usb-mouse"
+          "-device" "usb-tablet"
         ]
       else
         [ ]

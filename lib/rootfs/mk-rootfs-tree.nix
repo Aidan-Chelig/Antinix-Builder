@@ -194,5 +194,26 @@ runCommand "${systemName}-rootfs-tree"
           --allowed-prefixes-file "${closurePathsFile}"
 
         ${lib.concatStringsSep "\n" (spec.postBuild or [ ])}
+        bad_internal_links="$(
+          find "$out"/bin "$out"/sbin "$out"/lib "$out"/lib64 "$out"/usr/bin "$out"/usr/sbin \
+            -xtype l -printf '%P -> %l\n' 2>/dev/null || true
+        )"
+
+        if [ -n "$bad_internal_links" ]; then
+          echo "broken symlinks detected after postBuild:" >&2
+          printf '%s\n' "$bad_internal_links" >&2
+          exit 1
+        fi
+
+        absolute_internal_links="$(
+          find "$out"/bin "$out"/sbin "$out"/lib "$out"/lib64 "$out"/usr/bin "$out"/usr/sbin \
+            -type l -printf '%p -> %l\n' 2>/dev/null | sed -n 's#^'"$out"'##p' | grep ' -> /' || true
+        )"
+
+        if [ -n "$absolute_internal_links" ]; then
+          echo "absolute internal symlinks detected after postBuild:" >&2
+          printf '%s\n' "$absolute_internal_links" >&2
+          exit 1
+        fi
         write_phase post-process "$out"
   ''

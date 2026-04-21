@@ -4,16 +4,29 @@
   openrc,
 }:
 
+let
+  vmConsoleLib = pkgs.callPackage ./vm-console.nix { };
+in
+
 {
   console ? "ttyS0",
+  vmConsole ? { },
   hostname ? "vm",
   enablePasswdTrace ? false,
-  debug ? true,
+  debug ? false,
 }:
 
 let
   strip = builtins.unsafeDiscardStringContext;
   bin = pkg: strip "${pkgs.lib.getBin pkg}/bin";
+  vmConsoleCfg = vmConsoleLib.normalize {
+    inherit console vmConsole;
+  };
+  secureTtys = lib.unique (
+    lib.optional vmConsoleCfg.serialGetty.enable vmConsoleCfg.serialGetty.tty
+    ++ lib.optional vmConsoleCfg.graphicalGetty.enable vmConsoleCfg.graphicalGetty.tty
+    ++ [ "console" ]
+  );
 
   basePackages = [
     openrc
@@ -21,8 +34,6 @@ let
     pkgs.coreutils
     (pkgs.lib.getBin pkgs.util-linux)
     pkgs.procps
-    pkgs.kbd
-    pkgs.kmod
     pkgs.findutils
     pkgs.nettools
     pkgs.inetutils
@@ -30,7 +41,7 @@ let
     pkgs.pam
     pkgs.libxcrypt
     pkgs.gnugrep
-  ];
+  ] ++ vmConsoleCfg.packages;
 
   extraTracePackages = lib.optionals enablePasswdTrace [ pkgs.strace ];
 in
@@ -63,13 +74,27 @@ in
       mode = "0755";
     };
 
-    "/etc/securetty" = {
+    "/etc/init.d/vm-console" = {
       text = ''
-        ttyS0
-        tty1
-        ttyAMA0
-        console
+        #!/sbin/openrc-run
+
+        description="Prepare VM console devices and input stack"
+
+        depend() {
+          need localmount
+          before agetty agetty.tty1 agetty.${vmConsoleCfg.serialGetty.tty}
+        }
+
+        start() {
+        ${vmConsoleLib.loadInputDrivers vmConsoleCfg}
+        ${vmConsoleLib.switchToGraphicalVt vmConsoleCfg}
+        }
       '';
+      mode = "0755";
+    };
+
+    "/etc/securetty" = {
+      text = lib.concatStringsSep "\n" secureTtys + "\n";
       mode = "0644";
     };
 
@@ -88,11 +113,11 @@ in
       mode = "0644";
     };
 
-    "/etc/conf.d/agetty.${console}" = {
+    "/etc/conf.d/agetty.${vmConsoleCfg.serialGetty.tty}" = {
       text = ''
-        agetty_options="-l /usr/bin/login"
-        baudrate="115200"
-        term_type="vt100"
+        agetty_options="${vmConsoleLib.gettyOptions vmConsoleCfg.serialGetty}"
+        baud="${vmConsoleCfg.serialGetty.baud}"
+        term_type="${vmConsoleCfg.serialGetty.term}"
       '';
       mode = "0644";
     };
@@ -164,9 +189,18 @@ in
 
     "/etc/conf.d/agetty" = {
       text = ''
-        agetty_options="-l /usr/bin/login"
-        baudrate="115200"
-        term_type="vt100"
+        agetty_options="${vmConsoleLib.gettyOptions vmConsoleCfg.serialGetty}"
+        baud="${vmConsoleCfg.serialGetty.baud}"
+        term_type="${vmConsoleCfg.serialGetty.term}"
+      '';
+      mode = "0644";
+    };
+
+    "/etc/conf.d/agetty.${vmConsoleCfg.graphicalGetty.tty}" = {
+      text = ''
+        agetty_options="${vmConsoleLib.gettyOptions vmConsoleCfg.graphicalGetty}"
+        baud="${vmConsoleCfg.graphicalGetty.baud}"
+        term_type="${vmConsoleCfg.graphicalGetty.term}"
       '';
       mode = "0644";
     };
@@ -251,21 +285,26 @@ in
     };
   };
 
-  symlinks = {
-    "/sbin/init" = "/usr/bin/openrc-init";
-    "/sbin/openrc" = "/usr/bin/openrc";
-    "/sbin/openrc-run" = "/usr/bin/openrc-run";
-    "/sbin/agetty" = "/usr/bin/agetty";
-    "/bin/sysctl" = "/usr/bin/sysctl";
-    "/bin/login" = "/usr/bin/login";
-    "/etc/runlevels/default/local" = "/etc/init.d/local";
-
-    "/etc/init.d/agetty.${console}" = "/etc/init.d/agetty";
-    "/etc/runlevels/default/agetty.${console}" = "/etc/init.d/agetty.${console}";
+  symlinks =
+    {
+      "/sbin/init" = "/usr/bin/openrc-init";
+      "/sbin/openrc" = "/usr/bin/openrc";
+      "/sbin/openrc-run" = "/usr/bin/openrc-run";
+      "/sbin/agetty" = "/usr/bin/agetty";
+      "/bin/sysctl" = "/usr/bin/sysctl";
+      "/bin/login" = "/usr/bin/login";
+      "/etc/runlevels/default/local" = "/etc/init.d/local";
+    }
+  // lib.optionalAttrs vmConsoleCfg.serialGetty.enable {
+    "/etc/init.d/agetty.${vmConsoleCfg.serialGetty.tty}" = "/etc/init.d/agetty";
+    "/etc/runlevels/default/agetty.${vmConsoleCfg.serialGetty.tty}" = "/etc/init.d/agetty.${vmConsoleCfg.serialGetty.tty}";
   }
-  // lib.optionalAttrs (console != "tty1") {
-    "/etc/init.d/agetty.tty1" = "/etc/init.d/agetty";
-    "/etc/runlevels/default/agetty.tty1" = "/etc/init.d/agetty.tty1";
+  // {
+    "/etc/runlevels/boot/vm-console" = "/etc/init.d/vm-console";
+  }
+  // lib.optionalAttrs vmConsoleCfg.graphicalGetty.enable {
+    "/etc/init.d/agetty.${vmConsoleCfg.graphicalGetty.tty}" = "/etc/init.d/agetty";
+    "/etc/runlevels/default/agetty.${vmConsoleCfg.graphicalGetty.tty}" = "/etc/init.d/agetty.${vmConsoleCfg.graphicalGetty.tty}";
   };
 
   patching = {

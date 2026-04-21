@@ -1,13 +1,24 @@
 { lib, pkgs }:
 
+let
+  vmConsoleLib = pkgs.callPackage ./vm-console.nix { };
+in
+
 {
   console ? "ttyS0",
+  vmConsole ? { },
   hostname ? "vm",
   enablePasswdTrace ? false,
   debug ? false,
 }:
 
 let
+  vmConsoleCfg = vmConsoleLib.normalize {
+    inherit console vmConsole;
+  };
+
+  graphicalGettyService = "getty.${vmConsoleCfg.graphicalGetty.tty}";
+
   basePackages = [
     pkgs.bash
     pkgs.coreutils
@@ -16,7 +27,7 @@ let
     (pkgs.lib.getBin pkgs.shadow)
     pkgs.pam
     pkgs.libxcrypt
-  ];
+  ] ++ vmConsoleCfg.packages;
 
   extraTracePackages = lib.optionals enablePasswdTrace [ pkgs.strace ];
 
@@ -74,6 +85,8 @@ in
         #!/bin/sh
         set -eu
 
+        ${vmConsoleLib.mountHelpers}
+
         export HOME=/root
         export USER=root
         export LOGNAME=root
@@ -82,10 +95,7 @@ in
         export TERM="''${TERM:-linux}"
         export TERMINFO_DIRS="''${TERMINFO_DIRS:-/lib/terminfo:/usr/share/terminfo:/usr/lib/terminfo}"
 
-        /bin/mount -t proc proc /proc || true
-        /bin/mount -t sysfs sysfs /sys || true
-        /bin/mount -t devtmpfs devtmpfs /dev || true
-        /bin/mount -t tmpfs tmpfs /run || true
+        ${vmConsoleLib.mountCommands}
 
         /bin/mkdir -p /run/runit
         /bin/mkdir -p /run/wrappers/bin
@@ -94,6 +104,12 @@ in
         [ -e /dev/null ] || /bin/mknod -m 666 /dev/null c 1 3
         [ -e /dev/console ] || /bin/mknod -m 600 /dev/console c 5 1
         [ -e /dev/tty ] || /bin/mknod -m 666 /dev/tty c 5 0
+
+        ${vmConsoleLib.loadInputDrivers vmConsoleCfg}
+
+        ${lib.optionalString vmConsoleCfg.graphicalGetty.enable ''
+          ${vmConsoleLib.switchToGraphicalVt vmConsoleCfg}
+        ''}
 
         ${lib.optionalString debug ''
           echo "[runit debug] stage 1 shell"
@@ -139,19 +155,19 @@ in
         #!/bin/sh
         export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
-        exec </dev/${console} >/dev/${console} 2>&1
-        exec /usr/bin/setsid -c /usr/bin/agetty -L ${console} 115200 vt100 -l /usr/bin/login
+        exec </dev/${vmConsoleCfg.serialGetty.tty} >/dev/${vmConsoleCfg.serialGetty.tty} 2>&1
+        exec /usr/bin/setsid -c ${vmConsoleLib.gettyCommand vmConsoleCfg.serialGetty}
       '';
       mode = "0755";
     };
 
-    "/etc/sv/getty.tty1/run" = {
+    "/etc/sv/${graphicalGettyService}/run" = {
       text = ''
         #!/bin/sh
         export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
-        exec </dev/tty1 >/dev/tty1 2>&1
-        exec /usr/bin/setsid -c /usr/bin/agetty tty1 115200 linux -l /usr/bin/login
+        exec </dev/${vmConsoleCfg.graphicalGetty.tty} >/dev/${vmConsoleCfg.graphicalGetty.tty} 2>&1
+        exec /usr/bin/setsid -c ${vmConsoleLib.gettyCommand vmConsoleCfg.graphicalGetty}
       '';
       mode = "0755";
     };
@@ -178,10 +194,12 @@ in
   symlinks =
     {
       "/sbin/init" = "/usr/bin/runit";
+    }
+    // lib.optionalAttrs vmConsoleCfg.serialGetty.enable {
       "/etc/service/getty" = "/etc/sv/getty";
     }
-    // lib.optionalAttrs (console != "tty1") {
-      "/etc/service/getty.tty1" = "/etc/sv/getty.tty1";
+    // lib.optionalAttrs vmConsoleCfg.graphicalGetty.enable {
+      "/etc/service/${graphicalGettyService}" = "/etc/sv/${graphicalGettyService}";
     };
 
   runtime = {

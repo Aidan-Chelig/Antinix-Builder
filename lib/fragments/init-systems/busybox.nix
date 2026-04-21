@@ -1,20 +1,29 @@
 { lib, pkgs }:
 
+let
+  vmConsoleLib = pkgs.callPackage ./vm-console.nix { };
+in
+
 {
   console ? "ttyS0",
+  vmConsole ? { },
   hostname ? "vm",
   enablePasswdTrace ? false,
   debug ? false,
 }:
 
 let
+  vmConsoleCfg = vmConsoleLib.normalize {
+    inherit console vmConsole;
+  };
+
   basePackages = [
     pkgs.busybox
     pkgs.util-linux
     (pkgs.lib.getBin pkgs.shadow)
     pkgs.pam
     pkgs.libxcrypt
-  ];
+  ] ++ vmConsoleCfg.packages;
 
   extraTracePackages = lib.optionals enablePasswdTrace [ pkgs.strace ];
 
@@ -28,8 +37,8 @@ in
     "/etc/inittab" = {
       text = ''
         ::sysinit:/etc/init.d/rcS
-        ${console}::respawn:/usr/bin/agetty -L ${console} 115200 vt100 -l /usr/bin/login
-        tty1::respawn:/usr/bin/agetty tty1 115200 linux -l /usr/bin/login
+        ${lib.optionalString vmConsoleCfg.serialGetty.enable "${vmConsoleCfg.serialGetty.tty}::respawn:${vmConsoleLib.gettyCommand vmConsoleCfg.serialGetty}"}
+        ${lib.optionalString vmConsoleCfg.graphicalGetty.enable "${vmConsoleCfg.graphicalGetty.tty}::respawn:${vmConsoleLib.gettyCommand vmConsoleCfg.graphicalGetty}"}
         ::ctrlaltdel:/bin/reboot
         ::shutdown:/bin/umount -a -r
         ::shutdown:/bin/swapoff -a
@@ -42,6 +51,8 @@ in
     #!/bin/sh
     set -eu
 
+    ${vmConsoleLib.mountHelpers}
+
     export HOME=/root
     export USER=root
     export LOGNAME=root
@@ -50,10 +61,7 @@ in
     export TERM="''${TERM:-linux}"
     export TERMINFO_DIRS="''${TERMINFO_DIRS:-/lib/terminfo:/usr/share/terminfo:/usr/lib/terminfo}"
 
-    mount -t proc proc /proc || true
-    mount -t sysfs sysfs /sys || true
-    mount -t devtmpfs devtmpfs /dev || true
-    mount -t tmpfs tmpfs /run || true
+    ${vmConsoleLib.mountCommands}
 
     [ -e /dev/null ] || mknod -m 666 /dev/null c 1 3
     [ -e /dev/zero ] || mknod -m 666 /dev/zero c 1 5
@@ -68,27 +76,13 @@ in
       ln -sf /usr/sbin/unix_chkpwd /run/wrappers/bin/unix_chkpwd
     fi
 
-    # Load common VM input drivers so graphical console input works even
-    # without udev-based module autoload.
-    for mod in \
-      virtio_gpu \
-      drm \
-      drm_kms_helper \
-      i8042 \
-      atkbd \
-      psmouse \
-      evdev \
-      xhci_pci \
-      xhci_hcd \
-      usbhid \
-      hid_generic
-    do
-      modprobe "$mod" >/dev/null 2>&1 || true
-    done
+    ${vmConsoleLib.loadInputDrivers vmConsoleCfg}
 
     if [ -f /etc/hostname ]; then
       /usr/bin/hostname "$(cat /etc/hostname)" || true
     fi
+
+    ${vmConsoleLib.switchToGraphicalVt vmConsoleCfg}
 
     ${lib.optionalString debug ''
       echo "[busybox-init debug] dropping to shell"
@@ -169,10 +163,21 @@ in
   postBuild = [
     ''
       rm -f "$out/sbin/init"
-      ln -s /bin/busybox "$out/sbin/init"
+      ln -s ../bin/busybox "$out/sbin/init"
 
       rm -f "$out/bin/sh"
-      ln -s /bin/busybox "$out/bin/sh"
+      ln -s busybox "$out/bin/sh"
+
+      if [ -e "$out/usr/bin/kmod" ]; then
+        mkdir -p "$out/bin" "$out/sbin"
+        rm -f "$out/usr/bin/modprobe" "$out/bin/modprobe" "$out/sbin/modprobe"
+        ln -s kmod "$out/usr/bin/modprobe"
+        ln -s ../usr/bin/modprobe "$out/bin/modprobe"
+        ln -s ../usr/bin/modprobe "$out/sbin/modprobe"
+      fi
+
+      # This image uses dracut + kernel module autoload, not BusyBox's mini-udev path.
+      rm -f "$out/usr/bin/mdev" "$out/usr/bin/uevent"
     ''
   ];
 
@@ -203,19 +208,3 @@ in
   };
 
 }
-
-# What I would change immediately
-# 1. Remove /init from busybox.nix
-#
-# Not right this second if you still need it for debugging, but conceptually it should go.
-#
-# 2. Prove whether the patcher is rewriting /sbin/init
-#
-# That’s the real question now.
-#
-# 3. If confirmed, fix it in the patcher or patcher config
-#
-# Likely by:
-#
-# excluding symlink rewrites for already-FHS-internal targets like /bin/busybox
-# or teaching the heuristic not to “upgrade” /bin/busybox to /usr/bin/busybox

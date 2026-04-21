@@ -1,13 +1,24 @@
 { lib, pkgs }:
 
+let
+  vmConsoleLib = pkgs.callPackage ./vm-console.nix { };
+in
+
 {
   console ? "ttyS0",
+  vmConsole ? { },
   hostname ? "vm",
   enablePasswdTrace ? false,
   debug ? false,
 }:
 
 let
+  vmConsoleCfg = vmConsoleLib.normalize {
+    inherit console vmConsole;
+  };
+
+  graphicalGettyService = "getty.${vmConsoleCfg.graphicalGetty.tty}";
+
   basePackages = [
     pkgs.bash
     pkgs.coreutils
@@ -17,7 +28,7 @@ let
     (pkgs.lib.getBin pkgs.shadow)
     pkgs.pam
     pkgs.libxcrypt
-  ];
+  ] ++ vmConsoleCfg.packages;
 
   extraTracePackages = lib.optionals enablePasswdTrace [ pkgs.strace ];
 
@@ -81,7 +92,16 @@ in
     "/etc/dinit.d/getty" = {
       text = ''
         type = process
-        command = /usr/bin/agetty -L 115200 ${console} vt100 -l /usr/bin/login
+        command = ${vmConsoleLib.gettyCommand vmConsoleCfg.serialGetty}
+        smooth-recovery = true
+      '';
+      mode = "0644";
+    };
+
+    "/etc/dinit.d/${graphicalGettyService}" = {
+      text = ''
+        type = process
+        command = ${vmConsoleLib.gettyCommand vmConsoleCfg.graphicalGetty}
         smooth-recovery = true
       '';
       mode = "0644";
@@ -92,6 +112,8 @@ in
         #!/bin/sh
         set -eu
 
+        ${vmConsoleLib.mountHelpers}
+
         export HOME=/root
         export USER=root
         export LOGNAME=root
@@ -100,10 +122,7 @@ in
         export TERM="''${TERM:-linux}"
         export TERMINFO_DIRS="''${TERMINFO_DIRS:-/lib/terminfo:/usr/share/terminfo:/usr/lib/terminfo}"
 
-        mount -t proc proc /proc || true
-        mount -t sysfs sysfs /sys || true
-        mount -t devtmpfs devtmpfs /dev || true
-        mount -t tmpfs tmpfs /run || true
+        ${vmConsoleLib.mountCommands}
 
         mkdir -p /run/wrappers/bin
         mkdir -p /etc/dinit.d/boot.d
@@ -123,7 +142,15 @@ in
           /usr/bin/hostname "$(cat /etc/hostname)" || true
         fi
 
-        ln -snf /etc/dinit.d/getty /etc/dinit.d/boot.d/getty
+        ${vmConsoleLib.loadInputDrivers vmConsoleCfg}
+
+        ${lib.optionalString vmConsoleCfg.serialGetty.enable ''
+          ln -snf /etc/dinit.d/getty /etc/dinit.d/boot.d/getty
+        ''}
+        ${lib.optionalString vmConsoleCfg.graphicalGetty.enable ''
+          ln -snf /etc/dinit.d/${graphicalGettyService} /etc/dinit.d/boot.d/${graphicalGettyService}
+          ${vmConsoleLib.switchToGraphicalVt vmConsoleCfg}
+        ''}
 
         ${lib.optionalString debug ''
           echo "[dinit debug] ls -la /etc/dinit.d"

@@ -82,6 +82,7 @@ in
 ##@ param: name string? System name used for artifact naming.
 ##@ param: hostname string? Hostname written into the rootfs.
 ##@ param: console string? Primary console name forwarded to init fragments, such as "ttyS0" or "ttyAMA0".
+##@ param: vmConsole attrset? Optional VM console policy forwarded to init fragments that support serial/graphical console customization.
 ##@ param: init string? Init system name.
 ##@ param: packageManager string? Package manager name.
 ##@ param: nixosSystem attrset? Optional nixosSystem used to derive kernel and modules.
@@ -114,6 +115,7 @@ args@{
   name ? null,
   hostname ? "localhost",
   console ? "ttyS0",
+  vmConsole ? { },
   init ? "busybox",
   packageManager ? "none",
 
@@ -212,6 +214,7 @@ let
   fragmentContext = {
     hostname = hostname;
     console = console;
+    vmConsole = vmConsole;
   };
 
   realizeFragment =
