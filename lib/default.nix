@@ -51,6 +51,8 @@ rootfsPatcher = linuxBuildPkgs.callPackage ../pkgs/rootfs-patcher.nix { };
 
   mkRootfsImage = linuxBuildPkgs.callPackage ./artifacts/rootfs-image.nix { };
 
+  mkBootableImage = linuxBuildPkgs.callPackage ./artifacts/bootable-image.nix { };
+
   overlaySpec = linuxBuildPkgs.callPackage ./boot/dracut/overlay-spec.nix { };
 
   dracutShellParser = linuxBuildPkgs.callPackage ../pkgs/dracut-shell-parser.nix { };
@@ -76,6 +78,7 @@ rootfsPatcher = linuxBuildPkgs.callPackage ../pkgs/rootfs-patcher.nix { };
       mkRootfsTree
       mkRootfsTarball
       mkRootfsImage
+      mkBootableImage
       initSystems
       packageManagers
       ;
@@ -83,8 +86,8 @@ rootfsPatcher = linuxBuildPkgs.callPackage ../pkgs/rootfs-patcher.nix { };
 
 ##@ name: antinixLib
 ##@ kind: module
-##@ summary: Top-level Antinix library exposing system builders and helpers.
-##@ returns: attrset containing mkSystem, mkInitrd, mkRunVm, schema, and utilities.
+##@ summary: Top-level Antinix library exposing system builders, boot/image helpers, profiles, and schema utilities.
+##@ returns: attrset containing mkSystem, mkInitrd, mkRunVm, mkBootableImage, profiles, schema, and supporting utilities.
 in
 {
   inherit
@@ -100,6 +103,7 @@ in
     mkRootfsTree
     mkRootfsTarball
     mkRootfsImage
+    mkBootableImage
     mkRunVm
     ;
 
@@ -177,11 +181,25 @@ in
   ##@ name: mkRootfsImage
   ##@ path: lib.mkRootfsImage
   ##@ kind: function
-  ##@ summary: Build a bootable disk image from a rootfs tree.
+  ##@ summary: Build an ext4 root filesystem image from a rootfs tree.
   ##@ param: rootfs path Rootfs tree to install into the image.
   ##@ param: name string? Output image name.
   ##@ param: debug attrset? Debug controls forwarded from the normalized system spec, including phase tracing and watched paths.
-  ##@ returns: Derivation producing a disk image file.
+  ##@ returns: Derivation producing a raw ext4 filesystem image.
+
+  ##@ name: mkBootableImage
+  ##@ path: lib.mkBootableImage
+  ##@ kind: function
+  ##@ summary: Build a raw UEFI bootable disk image containing an EFI system partition, GRUB, kernel, initrd, and ext4 root partition.
+  ##@ param: rootfsImage path Raw ext4 root filesystem image to place into the root partition.
+  ##@ param: kernelImage path Kernel image copied into the EFI partition.
+  ##@ param: initrd path Initrd copied into the EFI partition.
+  ##@ param: name string? Output image name prefix.
+  ##@ param: volumeLabel string? GPT root partition label.
+  ##@ param: espSizeMB int? EFI system partition size in MiB.
+  ##@ param: efiArch string? GRUB EFI target architecture, such as `x86_64-efi`.
+  ##@ param: boot attrset? Boot metadata such as GRUB label, timeout, EFI target, and extra kernel parameters.
+  ##@ returns: Derivation producing a raw bootable disk image.
 
   ##@ name: schema
   ##@ path: lib.schema
@@ -193,8 +211,8 @@ in
   ##@ name: profiles
   ##@ path: lib.profiles
   ##@ kind: module
-  ##@ summary: Reusable system fragments for common runtime and session setups.
-  ##@ returns: Attrset exposing runtime, sessions, and graphical profile helpers.
+  ##@ summary: Reusable system fragments for boot, virtualization, runtime, session, and graphical setups.
+  ##@ returns: Attrset exposing boot, vm, runtime, sessions, and graphical profile helpers.
   profiles = profiles;
 
   ##@ name: initSystems

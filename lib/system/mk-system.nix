@@ -7,6 +7,7 @@
   mkRootfsTree,
   mkRootfsTarball ? null,
   mkRootfsImage ? null,
+  mkBootableImage ? null,
   initSystems,
   packageManagers,
 }:
@@ -78,7 +79,7 @@ in
 ##@ name: mkSystem
 ##@ path: lib.mkSystem
 ##@ kind: function
-##@ summary: Build a system spec and rootfs artifacts.
+##@ summary: Build a system spec and produce rootfs, image, and optional bootable-disk artifacts.
 ##@ param: name string? System name used for artifact naming.
 ##@ param: hostname string? Hostname written into the rootfs.
 ##@ param: console string? Primary console name forwarded to init fragments, such as "ttyS0" or "ttyAMA0".
@@ -106,9 +107,13 @@ in
 ##@ param: patching attrset Advanced patcher configuration overrides.
 ##@ param: validation attrset Validation policy overrides for the normalized spec.
 ##@ param: meta attrset Free-form metadata attached to the resulting system spec.
+##@ param: boot attrset? Boot artifact metadata merged into `meta.boot`, typically provided by boot profiles such as `lib.profiles.boot.grubEfi`.
 ##@ param: buildTarball bool? Build a tarball artifact.
 ##@ param: buildImage bool? Build an image artifact.
-##@ returns: attrset containing config, normalizedSpec, rootfs, tarball, image, and meta.
+##@ param: buildBootImage bool? Build a raw UEFI bootable disk image using the configured boot metadata, kernel image, and initrd.
+##@ param: kernelImage path? Kernel image copied into the EFI partition when `buildBootImage = true`.
+##@ param: initrd path? Initrd copied into the EFI partition when `buildBootImage = true`.
+##@ returns: attrset containing config, normalizedSpec, rootfs, tarball, image, bootImage, and meta.
 ##@ example: antinixLib.mkSystem { name = "demo"; init = "openrc"; packageManager = "xbps"; buildImage = true; nixosSystem = kernelSystem; }
 
 args@{
@@ -142,9 +147,13 @@ args@{
   patching ? { },
   validation ? { },
   meta ? { },
+  boot ? { },
 
   buildTarball ? false,
   buildImage ? false,
+  buildBootImage ? false,
+  kernelImage ? null,
+  initrd ? null,
 
   ...
 }:
@@ -258,6 +267,7 @@ let
       selectedPackageManager = packageManager;
       kernelVersion = kernelVersion;
       includeKernelModules = includeKernelModules;
+      boot = boot;
     };
 
   userBaseFragment =
@@ -346,6 +356,48 @@ let
       }
     else
       null;
+
+  resolvedBoot = (normalizedSpec.meta.boot or { }) // boot;
+
+  bootImage =
+    if buildBootImage && mkBootableImage != null then
+      let
+        rootfsImage =
+          if image != null then
+            image
+          else
+            mkRootfsImage {
+              rootfsTarball =
+                if tarball != null then
+                  tarball
+                else
+                  mkRootfsTarball {
+                    rootfs = rootfs;
+                    name = systemName;
+                    users = normalizedSpec.users or { };
+                    groups = normalizedSpec.groups or { };
+                    debug = normalizedSpec.debug or { };
+                  };
+              name = systemName;
+              volumeLabel = systemName;
+              debug = normalizedSpec.debug or { };
+            };
+      in
+      assert kernelImage != null || throw "mkSystem: `kernelImage` is required when `buildBootImage = true`";
+      assert initrd != null || throw "mkSystem: `initrd` is required when `buildBootImage = true`";
+      assert resolvedBoot.loader or null == "grub-efi" || throw "mkSystem: only `meta.boot.loader = \"grub-efi\"` is supported for `buildBootImage` right now";
+      mkBootableImage {
+        inherit
+          rootfsImage
+          kernelImage
+          initrd
+          ;
+        name = systemName;
+        volumeLabel = systemName;
+        boot = resolvedBoot;
+      }
+    else
+      null;
 in
 {
   inherit
@@ -356,6 +408,7 @@ in
     rootfs
     tarball
     image
+    bootImage
     ;
 
   config = normalizedSpec;

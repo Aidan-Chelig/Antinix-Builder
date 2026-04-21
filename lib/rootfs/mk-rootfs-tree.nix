@@ -194,6 +194,25 @@ runCommand "${systemName}-rootfs-tree"
           --allowed-prefixes-file "${closurePathsFile}"
 
         ${lib.concatStringsSep "\n" (spec.postBuild or [ ])}
+
+        normalize_kernel_module_links() {
+          for modules_root in "$out/lib/modules" "$out/usr/lib/modules"; do
+            [ -d "$modules_root" ] || continue
+
+            while IFS= read -r link; do
+              target="$(readlink "$link" || true)"
+              case "$target" in
+                /nix/store/*)
+                  rm -f "$link"
+                  cp -a "$target" "$link"
+                  ;;
+              esac
+            done < <(find "$modules_root" -type l -print 2>/dev/null || true)
+          done
+        }
+
+        normalize_kernel_module_links
+
         bad_internal_links="$(
           find "$out"/bin "$out"/sbin "$out"/lib "$out"/lib64 "$out"/usr/bin "$out"/usr/sbin \
             -xtype l -printf '%P -> %l\n' 2>/dev/null || true

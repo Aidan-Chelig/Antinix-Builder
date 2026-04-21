@@ -50,10 +50,17 @@
             graphics = false;
             enableUdev = false;
           })
+          (antinixLib.profiles.boot.grubEfi {
+            label = "Antinix minimal";
+            extraKernelParams = [ "console=tty0" ];
+          })
         ];
 
         nixosSystem = kernelSystem;
         buildImage = true;
+        buildBootImage = true;
+        kernelImage = "${kernelSystem.config.system.build.kernel}/bzImage";
+        inherit initrd;
 
         groups.root = antinixLib.schema.mkGroup { gid = 0; };
 
@@ -92,6 +99,7 @@
     {
       packages.${system} = {
         default = demoSystem.image;
+        bootImage = demoSystem.bootImage;
         inherit vm;
       };
 

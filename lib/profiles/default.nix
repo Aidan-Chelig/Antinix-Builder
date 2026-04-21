@@ -5,6 +5,10 @@
 }:
 
 let
+  boot = pkgs.callPackage ./boot.nix {
+    inherit merge;
+  };
+
   runtime = pkgs.callPackage ./runtime.nix {
     inherit schema merge;
   };
@@ -21,6 +25,13 @@ let
   };
 in
 {
+  ##@ name: boot
+  ##@ path: lib.profiles.boot
+  ##@ kind: module
+  ##@ summary: Bootloader-oriented profiles that describe boot media metadata without forcing a specific artifact builder.
+  ##@ returns: Attrset exposing boot profile helpers such as grubEfi and minimalInstaller.
+  boot = boot;
+
   ##@ name: runtime
   ##@ path: lib.profiles.runtime
   ##@ kind: module
@@ -39,7 +50,7 @@ in
   ##@ path: lib.profiles.graphical
   ##@ kind: module
   ##@ summary: Higher-level graphical session profiles built from the runtime and session helpers.
-  ##@ returns: Attrset exposing graphical profile helpers such as labwcVm.
+  ##@ returns: Attrset exposing graphical profile helpers such as labwc, wlrootsVmCompat, and labwcVm.
   graphical = pkgs.callPackage ./graphical.nix {
     inherit
       schema
