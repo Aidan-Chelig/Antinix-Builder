@@ -20,8 +20,10 @@
   - [lib.profiles.graphical.seatd](#seatd)
   - [lib.profiles.graphical.wlrootsVmCompat](#wlrootsvmcompat)
   - [lib.profiles.runtime.dbusSession](#dbussession)
+  - [lib.profiles.runtime.dhcpClient](#dhcpclient)
   - [lib.profiles.runtime.fontconfig](#fontconfig)
   - [lib.profiles.runtime.graphicalBase](#graphicalbase)
+  - [lib.profiles.runtime.opengl](#opengl)
   - [lib.profiles.runtime.udev](#udev)
   - [lib.profiles.runtime.xkb](#xkb)
   - [lib.profiles.sessions.profileLauncher](#profilelauncher)
@@ -40,6 +42,9 @@
   - [lib.schema.mkService](#mkservice)
   - [lib.schema.mkTextPatch](#mktextpatch)
   - [lib.schema.mkUser](#mkuser)
+  - [system.mergePlan](#mergeplan)
+  - [system.processPlan](#processplan)
+  - [system.rewritePlan](#rewriteplan)
 - [Registry](#registry)
   - [lib.initSystems](#initsystems)
   - [lib.packageManagers](#packagemanagers)
@@ -60,6 +65,8 @@
   - [lib.profiles.vm](#vm)
   - [lib.schema](#schema)
   - [lib.schema.defaults](#defaults)
+  - [system.debug](#debug)
+  - [system.debug.patcher](#patcher)
 
 ## Function
 
@@ -222,7 +229,7 @@ Build a processed rootfs tree from a normalized system specification.
 
 #### Returns
 
-- Derivation containing the assembled rootfs tree.
+- Derivation containing the assembled rootfs tree, with `patcherDebug` passthru helpers for rootfs-patcher dry-run commands.
 
 ### mkRunVm
 
@@ -310,13 +317,14 @@ Build a system spec and produce rootfs, image, and optional bootable-disk artifa
 - `boot` *attrset?* — Boot artifact metadata merged into `meta.boot`, typically provided by boot profiles such as `lib.profiles.boot.grubEfi`.
 - `buildTarball` *bool?* — Build a tarball artifact.
 - `buildImage` *bool?* — Build an image artifact.
+- `imageSize` *string?* — Optional size passed to the ext4 rootfs image builder, such as "4G".
 - `buildBootImage` *bool?* — Build a raw UEFI bootable disk image using the configured boot metadata, kernel image, and initrd.
 - `kernelImage` *path?* — Kernel image copied into the EFI partition when `buildBootImage = true`.
 - `initrd` *path?* — Initrd copied into the EFI partition when `buildBootImage = true`.
 
 #### Returns
 
-- attrset containing config, normalizedSpec, rootfs, tarball, image, bootImage, and meta.
+- attrset containing config, normalizedSpec, rootfs, tarball, image, bootImage, dry-run helper launchers (`mergePlan`, `rewritePlan`, `processPlan`), debug helpers, and meta.
 
 #### Examples
 
@@ -445,6 +453,8 @@ Compose a VM-oriented Labwc session with udev, seatd, DBus, fontconfig, and tty 
 - `terminal` *string?* — Terminal command launched from Labwc autostart.
 - `terminalPackage` *derivation?* — Package added to the closure for the configured terminal command.
 - `extraSessionEnv` *attrset?* — Additional environment variables exported into the session.
+- `enableOpenGL` *bool?* — Install a Mesa userspace OpenGL driver runtime for graphical applications.
+- `softwareOpenGL` *bool?* — Force Mesa to use software rendering defaults inside the VM session.
 - `softwareRendering` *bool?* — Enable pixman rendering defaults for VM compatibility.
 - `softwareCursor` *bool?* — Force software cursor rendering for VM compatibility.
 - `home` *string?* — Home directory used by the session helper.
@@ -530,6 +540,30 @@ Add DBus runtime package support and session/system bus config files.
 antinixLib.profiles.runtime.dbusSession { }
 ```
 
+### dhcpClient
+
+Add a boot-time DHCP client service that brings up an interface and acquires an IPv4 lease.
+
+- **Path:** `lib.profiles.runtime.dhcpClient`
+- **Kind:** `function`
+- **Source:** `lib/profiles/runtime.nix`
+
+#### Parameters
+
+- `interface` *string?* — Interface name to configure. When null, the first non-loopback interface is selected.
+- `descriptionPrefix` *string?* — Prefix used in the generated service description.
+- `dependsOnUdev` *bool?* — Add udev and udev-trigger service dependencies before starting DHCP.
+
+#### Returns
+
+- Fragment that installs dhcpcd and a boot service for guest networking.
+
+#### Examples
+
+```nix
+antinixLib.profiles.runtime.dhcpClient { interface = "eth0"; }
+```
+
 ### fontconfig
 
 Add fontconfig package support and import /etc/fonts into the rootfs.
@@ -570,6 +604,28 @@ Add shared graphical runtime config such as DBus, fontconfig, and XKB compatibil
 
 ```nix
 antinixLib.profiles.runtime.graphicalBase { enableDbus = true; }
+```
+
+### opengl
+
+Add a Mesa userspace OpenGL runtime including DRI, GBM, EGL vendor, and Vulkan ICD files.
+
+- **Path:** `lib.profiles.runtime.opengl`
+- **Kind:** `function`
+- **Source:** `lib/profiles/runtime.nix`
+
+#### Parameters
+
+- `driversPackage` *derivation?* — Package providing the userspace graphics driver tree.
+
+#### Returns
+
+- Fragment that installs a Mesa-style graphics driver runtime into the rootfs.
+
+#### Examples
+
+```nix
+antinixLib.profiles.runtime.opengl { }
 ```
 
 ### udev
@@ -739,6 +795,8 @@ Add guest-side QEMU defaults for console behavior, input module loading, and opt
 - `loadInputModules` *bool?* — Load common QEMU graphics/input kernel modules during boot.
 - `switchToGraphicalVt` *bool?* — Switch to the configured graphical VT during boot.
 - `enableUdev` *bool?* — Add boot-time udev and coldplug services.
+- `enableDhcp` *bool?* — Add a boot-time DHCP client service for the guest NIC.
+- `networkInterface` *string?* — Interface name used by the DHCP client. When null, the first non-loopback interface is selected.
 - `descriptionPrefix` *string?* — Prefix used in generated udev service descriptions.
 
 #### Returns
@@ -953,6 +1011,42 @@ Define a system user.
 #### Returns
 
 - attrset describing a user.
+
+### mergePlan
+
+Dry-run launcher for the rootfs patcher merge phase for this system's rootfs tree.
+
+- **Path:** `system.mergePlan`
+- **Kind:** `helper`
+- **Source:** `lib/system/mk-system.nix`
+
+#### Returns
+
+- Runnable derivation that prints the planned closure-merge actions without mutating the rootfs.
+
+### processPlan
+
+Dry-run launcher for the full rootfs patcher pipeline for this system's rootfs tree.
+
+- **Path:** `system.processPlan`
+- **Kind:** `helper`
+- **Source:** `lib/system/mk-system.nix`
+
+#### Returns
+
+- Runnable derivation that prints the planned merge, normalization, rewrite, entrypoint, and wrapper actions without mutating the rootfs.
+
+### rewritePlan
+
+Dry-run launcher for the rootfs patcher rewrite phase for this system's rootfs tree.
+
+- **Path:** `system.rewritePlan`
+- **Kind:** `helper`
+- **Source:** `lib/system/mk-system.nix`
+
+#### Returns
+
+- Runnable derivation that prints the planned rewrite actions without mutating the rootfs.
 
 ## Registry
 
@@ -1172,3 +1266,27 @@ Default fragment shape used as the baseline for consumer-authored system specifi
 #### Returns
 
 - Attrset of default values for packages, files, users, runtime, patching, validation, and metadata.
+
+### debug
+
+Debug helpers derived from the built system artifacts.
+
+- **Path:** `system.debug`
+- **Kind:** `module`
+- **Source:** `lib/system/mk-system.nix`
+
+#### Returns
+
+- Attrset exposing rootfs patcher dry-run helpers and patcher input paths, including the same plans also aliased at `system.mergePlan`, `system.rewritePlan`, and `system.processPlan`.
+
+### patcher
+
+Prewired rootfs-patcher debug inputs and dry-run launchers for this system's rootfs tree.
+
+- **Path:** `system.debug.patcher`
+- **Kind:** `module`
+- **Source:** `lib/system/mk-system.nix`
+
+#### Returns
+
+- Attrset exposing `mergePlan`, `rewritePlan`, `processPlan`, and the generated config/input paths. Prefer the top-level `system.*Plan` aliases for normal use.

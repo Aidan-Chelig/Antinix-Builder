@@ -23,6 +23,12 @@ nix run ./examples/basic#rewritePlan
 nix run ./examples/graphical#mergePlan
 ```
 
+Each example flake exports all three dry-run helpers directly from its `mkSystem` result:
+
+- `#mergePlan`
+- `#rewritePlan`
+- `#processPlan`
+
 Build the installer-oriented flash-drive image with:
 
 ```bash

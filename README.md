@@ -278,6 +278,10 @@ Or regenerate it with:
 nix build .#api-reference
 ```
 
+The docgen comment format and maintenance rules are specified in:
+
+[docs/api-reference-spec.md](./docs/api-reference-spec.md)
+
 ---
 
 ## Design goals

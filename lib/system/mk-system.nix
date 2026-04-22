@@ -406,22 +406,35 @@ let
       null;
 in
 {
-  inherit
-    init
-    packageManager
-    mergedFragment
-    normalizedSpec
-    rootfs
-    tarball
-    image
-    bootImage
-    ;
+  init = init;
+  packageManager = packageManager;
+  mergedFragment = mergedFragment;
+  normalizedSpec = normalizedSpec;
+  rootfs = rootfs;
+  tarball = tarball;
+  image = image;
+  bootImage = bootImage;
 
-  inherit (rootfs.patcherDebug or (rootfs.passthru.patcherDebug or { }))
-    mergePlan
-    rewritePlan
-    processPlan
-    ;
+  ##@ name: mergePlan
+  ##@ path: system.mergePlan
+  ##@ kind: helper
+  ##@ summary: Dry-run launcher for the rootfs patcher merge phase for this system's rootfs tree.
+  ##@ returns: Runnable derivation that prints the planned closure-merge actions without mutating the rootfs.
+  mergePlan = (rootfs.patcherDebug or (rootfs.passthru.patcherDebug or { })).mergePlan;
+
+  ##@ name: rewritePlan
+  ##@ path: system.rewritePlan
+  ##@ kind: helper
+  ##@ summary: Dry-run launcher for the rootfs patcher rewrite phase for this system's rootfs tree.
+  ##@ returns: Runnable derivation that prints the planned rewrite actions without mutating the rootfs.
+  rewritePlan = (rootfs.patcherDebug or (rootfs.passthru.patcherDebug or { })).rewritePlan;
+
+  ##@ name: processPlan
+  ##@ path: system.processPlan
+  ##@ kind: helper
+  ##@ summary: Dry-run launcher for the full rootfs patcher pipeline for this system's rootfs tree.
+  ##@ returns: Runnable derivation that prints the planned merge, normalization, rewrite, entrypoint, and wrapper actions without mutating the rootfs.
+  processPlan = (rootfs.patcherDebug or (rootfs.passthru.patcherDebug or { })).processPlan;
 
   config = normalizedSpec;
 
@@ -429,13 +442,13 @@ in
   ##@ path: system.debug
   ##@ kind: module
   ##@ summary: Debug helpers derived from the built system artifacts.
-  ##@ returns: Attrset exposing rootfs patcher dry-run helpers and patcher input paths.
+  ##@ returns: Attrset exposing rootfs patcher dry-run helpers and patcher input paths, including the same plans also aliased at `system.mergePlan`, `system.rewritePlan`, and `system.processPlan`.
   debug = {
     ##@ name: patcher
     ##@ path: system.debug.patcher
     ##@ kind: module
     ##@ summary: Prewired rootfs-patcher debug inputs and dry-run launchers for this system's rootfs tree.
-    ##@ returns: Attrset exposing `mergePlan`, `rewritePlan`, `processPlan`, and the generated config/input paths.
+    ##@ returns: Attrset exposing `mergePlan`, `rewritePlan`, `processPlan`, and the generated config/input paths. Prefer the top-level `system.*Plan` aliases for normal use.
     patcher = rootfs.patcherDebug or (rootfs.passthru.patcherDebug or { });
   };
 
