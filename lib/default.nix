@@ -39,6 +39,7 @@ rootfsPatcher = linuxBuildPkgs.callPackage ../pkgs/rootfs-patcher.nix { };
     buildEnv = linuxBuildPkgs.buildEnv;
     runCommand = linuxBuildPkgs.runCommand;
     writeText = linuxBuildPkgs.writeText;
+    writeShellApplication = linuxBuildPkgs.writeShellApplication;
     inherit
       accounts
       overlay
@@ -165,7 +166,7 @@ in
   ##@ param: spec.debug.tracePhases bool? Emit phase checkpoint files under /debug during rootfs construction.
   ##@ param: spec.debug.watchPaths list? Paths recorded in each phase checkpoint artifact.
   ##@ param: spec.debug.generatePatcherArtifacts bool? Enable Rust rootfs-patcher debug artifacts under /debug.
-  ##@ returns: Derivation containing the assembled rootfs tree.
+  ##@ returns: Derivation containing the assembled rootfs tree, with `patcherDebug` passthru helpers for rootfs-patcher dry-run commands.
 
   ##@ name: mkRootfsTarball
   ##@ path: lib.mkRootfsTarball

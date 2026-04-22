@@ -15,6 +15,14 @@ nix run ./examples/basic
 nix run ./examples/graphical
 ```
 
+Dry-run the rootfs patcher pipeline for an example with:
+
+```bash
+nix run ./examples/minimal#processPlan
+nix run ./examples/basic#rewritePlan
+nix run ./examples/graphical#mergePlan
+```
+
 Build the installer-oriented flash-drive image with:
 
 ```bash

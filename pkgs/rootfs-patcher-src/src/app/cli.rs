@@ -18,6 +18,8 @@ pub enum Command {
         config: PathBuf,
         #[arg(long)]
         allowed_prefixes_file: Option<PathBuf>,
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
     },
     Rewrite {
         #[arg(long)]
@@ -26,6 +28,8 @@ pub enum Command {
         config: PathBuf,
         #[arg(long)]
         allowed_prefixes_file: Option<PathBuf>,
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
     },
     Scan {
         #[arg(long)]
@@ -41,8 +45,12 @@ pub enum Command {
         #[arg(long)]
         root: PathBuf,
         #[arg(long)]
+        config: PathBuf,
+        #[arg(long)]
         closure_paths_file: PathBuf,
         #[arg(long = "data-dir")]
         data_dirs: Vec<String>,
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
     },
 }

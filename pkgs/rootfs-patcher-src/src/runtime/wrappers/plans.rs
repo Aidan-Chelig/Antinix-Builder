@@ -29,6 +29,65 @@ pub(super) fn apply_runtime_wrappers(
     Ok(())
 }
 
+pub(super) fn plan_runtime_wrappers(root: &Path) -> Result<Vec<RewriteEvent>> {
+    let plan = detect_runtime_plan(root).context("failed to detect runtime plan")?;
+    let mut events = Vec::new();
+
+    for family in &plan.families {
+        match family {
+            RuntimeFamilyPlan::Perl(perl) => {
+                for spec in perl_wrapper_specs(perl) {
+                    events.push(RewriteEvent {
+                        pass: "runtime-wrapper".to_string(),
+                        file: spec.binary,
+                        action: "install-env-wrapper".to_string(),
+                        from: None,
+                        to: None,
+                        note: Some(format_env_note(&spec.env)),
+                    });
+                }
+            }
+            RuntimeFamilyPlan::Python(python) => {
+                for spec in python_wrapper_specs(python) {
+                    events.push(RewriteEvent {
+                        pass: "runtime-wrapper".to_string(),
+                        file: spec.binary,
+                        action: "install-env-wrapper".to_string(),
+                        from: None,
+                        to: None,
+                        note: Some(format_env_note(&spec.env)),
+                    });
+                }
+            }
+            RuntimeFamilyPlan::Lua(lua) => {
+                for spec in lua_wrapper_specs(lua) {
+                    events.push(RewriteEvent {
+                        pass: "runtime-wrapper".to_string(),
+                        file: spec.binary,
+                        action: "install-env-wrapper".to_string(),
+                        from: None,
+                        to: None,
+                        note: Some(format_env_note(&spec.env)),
+                    });
+                }
+
+                for bin in &lua.unresolved_binaries {
+                    events.push(RewriteEvent {
+                        pass: "runtime-wrapper".to_string(),
+                        file: bin.clone(),
+                        action: "skip-runtime-wrapper-unresolved".to_string(),
+                        from: None,
+                        to: None,
+                        note: Some("lua-entrypoint-has-no-real-leaf".to_string()),
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(events)
+}
+
 pub(super) fn detect_runtime_plan(root: &Path) -> Result<RuntimePlan> {
     let mut families = Vec::new();
 
@@ -439,6 +498,13 @@ fn lua_wrapper_specs(plan: &LuaPlan) -> Vec<EnvWrapperSpec> {
             ],
         })
         .collect()
+}
+
+fn format_env_note(env: &[(String, String)]) -> String {
+    env.iter()
+        .map(|(key, value)| format!("{key}={value}"))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn looks_like_perl_version_dir(name: &str) -> bool {

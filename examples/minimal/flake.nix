@@ -100,6 +100,11 @@
       packages.${system} = {
         default = demoSystem.image;
         bootImage = demoSystem.bootImage;
+        inherit (demoSystem)
+          mergePlan
+          rewritePlan
+          processPlan
+          ;
         inherit vm;
       };
 

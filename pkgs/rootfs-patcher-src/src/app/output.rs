@@ -1,4 +1,4 @@
-use crate::model::{FileKind, Finding, ScanMode};
+use crate::model::{FileKind, Finding, RewriteEvent, ScanMode};
 
 pub fn print_findings(findings: &[Finding]) {
     let strict: Vec<_> = findings
@@ -32,6 +32,24 @@ pub fn print_findings(findings: &[Finding]) {
     }
 
     println!("[rootfs-patcher] strict findings: {}", strict.len());
+}
+
+pub fn print_rewrite_events(events: &[RewriteEvent]) {
+    for event in events {
+        println!("PLAN {} {} {}", event.pass, event.action, event.file);
+        if let Some(from) = &event.from {
+            println!("  from: {from}");
+        }
+        if let Some(to) = &event.to {
+            println!("  to: {to}");
+        }
+        if let Some(note) = &event.note {
+            println!("  note: {note}");
+        }
+        println!();
+    }
+
+    println!("[rootfs-patcher] planned actions: {}", events.len());
 }
 
 fn kind_label(kind: FileKind) -> &'static str {

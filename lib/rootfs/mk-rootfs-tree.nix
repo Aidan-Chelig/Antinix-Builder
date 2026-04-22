@@ -4,6 +4,7 @@
   buildEnv,
   runCommand,
   writeText,
+  writeShellApplication,
   accounts,
   overlay,
   patcherConfig,
@@ -13,6 +14,7 @@
 spec:
 let
   systemName = if spec.name != null then spec.name else "rootfs";
+  dataDirs = [ "share" ];
   debug = spec.debug or { };
   tracePhases = debug.tracePhases or false;
   watchPaths = debug.watchPaths or [ ];
@@ -109,8 +111,44 @@ let
     builtins.toJSON patcherConfigValue
   );
 
-in
-runCommand "${systemName}-rootfs-tree"
+  patcherCommand =
+    subcommand: extraArgs:
+    lib.escapeShellArgs (
+      [
+        "${rootfsPatcher}/bin/rootfs-patcher"
+        subcommand
+        "--dry-run"
+        "--root"
+        "${rootfsTree}"
+        "--config"
+        "${patcherConfigJson}"
+      ]
+      ++ extraArgs
+    );
+
+  patcherDryRunScript =
+    {
+      name,
+      subcommand,
+      extraArgs ? [ ],
+    }:
+    writeShellApplication {
+      name = "${systemName}-${name}";
+      runtimeInputs = [
+        rootfsPatcher
+        pkgs.coreutils
+      ];
+      text = ''
+        set -euo pipefail
+        cmd=(${patcherCommand subcommand extraArgs})
+        printf 'PATCHER CMD: %q ' "''${cmd[@]}"
+        printf '\n'
+        exec "''${cmd[@]}"
+      '';
+    };
+
+  rootfsTree =
+    runCommand "${systemName}-rootfs-tree"
   {
     nativeBuildInputs = [
       rootfsPatcher
@@ -119,6 +157,42 @@ runCommand "${systemName}-rootfs-tree"
       pkgs.gnused
       pkgs.gnugrep
     ];
+    passthru = {
+      patcherDebug = {
+        config = patcherConfigJson;
+        allowedPrefixesFile = closurePathsFile;
+        inherit closurePathsFile dataDirs;
+        mergePlan = patcherDryRunScript {
+          name = "rootfs-patcher-merge-plan";
+          subcommand = "merge";
+          extraArgs =
+            [
+              "--closure-paths-file"
+              "${closurePathsFile}"
+            ]
+            ++ lib.concatMap (dir: [
+              "--data-dir"
+              dir
+            ]) dataDirs;
+        };
+        rewritePlan = patcherDryRunScript {
+          name = "rootfs-patcher-rewrite-plan";
+          subcommand = "rewrite";
+          extraArgs = [
+            "--allowed-prefixes-file"
+            "${closurePathsFile}"
+          ];
+        };
+        processPlan = patcherDryRunScript {
+          name = "rootfs-patcher-process-plan";
+          subcommand = "process";
+          extraArgs = [
+            "--allowed-prefixes-file"
+            "${closurePathsFile}"
+          ];
+        };
+      };
+    };
   }
   ''
         set -euo pipefail
@@ -181,8 +255,9 @@ runCommand "${systemName}-rootfs-tree"
 
         "${rootfsPatcher}/bin/rootfs-patcher" merge \
           --root "$out" \
+          --config "${patcherConfigJson}" \
           --closure-paths-file "${closurePathsFile}" \
-          --data-dir share
+          ${lib.concatMapStringsSep " " (dir: "--data-dir ${lib.escapeShellArg dir}") dataDirs}
 
         chmod u+w "$out"
         chmod -R u+w "$out" 2>/dev/null || true
@@ -235,4 +310,6 @@ runCommand "${systemName}-rootfs-tree"
           exit 1
         fi
         write_phase post-process "$out"
-  ''
+  '';
+in
+rootfsTree

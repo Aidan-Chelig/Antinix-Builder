@@ -14,6 +14,8 @@ rec {
   ##@ param: loadInputModules bool? Load common QEMU graphics/input kernel modules during boot.
   ##@ param: switchToGraphicalVt bool? Switch to the configured graphical VT during boot.
   ##@ param: enableUdev bool? Add boot-time udev and coldplug services.
+  ##@ param: enableDhcp bool? Add a boot-time DHCP client service for the guest NIC.
+  ##@ param: networkInterface string? Interface name used by the DHCP client. When null, the first non-loopback interface is selected.
   ##@ param: descriptionPrefix string? Prefix used in generated udev service descriptions.
   ##@ returns: Fragment that composes vmConsole guest defaults and optional runtime.udev support for QEMU guests.
   ##@ example: antinixLib.profiles.vm.qemuGuest { graphics = true; enableUdev = true; }
@@ -25,6 +27,8 @@ rec {
       loadInputModules ? graphics,
       switchToGraphicalVt ? graphics,
       enableUdev ? graphics,
+      enableDhcp ? false,
+      networkInterface ? null,
       descriptionPrefix ? "QEMU guest",
     }:
     merge.mergeMany (
@@ -46,6 +50,11 @@ rec {
       ]
       ++ maybe enableUdev (runtime.udev {
         inherit descriptionPrefix;
+      })
+      ++ maybe enableDhcp (runtime.dhcpClient {
+        inherit descriptionPrefix;
+        interface = networkInterface;
+        dependsOnUdev = enableUdev;
       })
     );
 }

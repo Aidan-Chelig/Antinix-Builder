@@ -56,6 +56,36 @@ pub(super) fn resolve_and_import_public_entrypoints(
     Ok(())
 }
 
+pub(super) fn plan_public_entrypoint_imports(
+    root: &Path,
+    artifact_index: &ArtifactIndex,
+) -> Result<Vec<RewriteEvent>> {
+    let mut events = Vec::new();
+
+    for dir in ["/bin", "/sbin", "/usr/bin", "/usr/sbin"] {
+        let abs_dir = root.join(dir.trim_start_matches('/'));
+        if !abs_dir.exists() {
+            continue;
+        }
+
+        for entry in fs::read_dir(&abs_dir)
+            .with_context(|| format!("failed to read directory {}", abs_dir.display()))?
+        {
+            let entry =
+                entry.with_context(|| format!("failed to read entry in {}", abs_dir.display()))?;
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+
+            let rel = super::plans::path_in_root(root, &path)?;
+            plan_public_entrypoint_if_needed(root, &rel, artifact_index, &mut events)?;
+        }
+    }
+
+    Ok(events)
+}
+
 fn resolve_and_import_public_entrypoint_if_needed(
     root: &Path,
     bin_rel: &str,
@@ -182,6 +212,100 @@ fn resolve_and_import_public_entrypoint_if_needed(
         file: bin_rel.to_string(),
         status: "resolved".to_string(),
         detail: format!("leaf={leaf}, wrapped_backup={wrapped_rel}"),
+    });
+
+    Ok(())
+}
+
+fn plan_public_entrypoint_if_needed(
+    root: &Path,
+    bin_rel: &str,
+    artifact_index: &ArtifactIndex,
+    events: &mut Vec<RewriteEvent>,
+) -> Result<()> {
+    let bin_abs = root.join(bin_rel.trim_start_matches('/'));
+    if !bin_abs.is_file() {
+        return Ok(());
+    }
+
+    let bytes =
+        fs::read(&bin_abs).with_context(|| format!("failed to read {}", bin_abs.display()))?;
+
+    let store_target = extract_nix_wrapper_target(&bytes);
+    let shell_target = extract_shell_exec_target(&bytes);
+
+    if store_target.is_none() && shell_target.is_none() {
+        return Ok(());
+    }
+
+    let resolved = resolve_runtime_entrypoint(root, bin_rel)?;
+
+    let leaf = match resolved {
+        ResolvedEntrypoint::Leaf(leaf) => Some(leaf),
+        ResolvedEntrypoint::Unresolved => {
+            if let Some(store_target) = store_target {
+                match candidate_leaf_name_from_store_target(&store_target) {
+                    Some(target_base) => {
+                        let resolved = resolve_executable(artifact_index, &target_base);
+
+                        match resolved {
+                            Some(resolved) if resolved.kind == ArtifactKind::Executable => {
+                                match resolved.origin {
+                                    ArtifactOrigin::Rootfs => Some(resolved.resolved_path),
+                                    ArtifactOrigin::ClosureImported => {
+                                        let imported = format!(
+                                            "/usr/libexec/antinix/imported-entrypoints/{}",
+                                            Path::new(&resolved.resolved_path)
+                                                .file_name()
+                                                .and_then(|s| s.to_str())
+                                                .unwrap_or("imported")
+                                        );
+                                        events.push(RewriteEvent {
+                                            pass: "entrypoint-normalization".to_string(),
+                                            file: bin_rel.to_string(),
+                                            action: "import-real-leaf-from-closure".to_string(),
+                                            from: resolved.source_path.clone(),
+                                            to: Some(imported.clone()),
+                                            note: Some(format!("request={}", resolved.request)),
+                                        });
+                                        Some(imported)
+                                    }
+                                }
+                            }
+                            _ => None,
+                        }
+                    }
+                    None => None,
+                }
+            } else {
+                None
+            }
+        }
+    };
+
+    let Some(leaf) = leaf else {
+        events.push(RewriteEvent {
+            pass: "entrypoint-normalization".to_string(),
+            file: bin_rel.to_string(),
+            action: "normalize-wrapped-entrypoint-unresolved".to_string(),
+            from: None,
+            to: None,
+            note: None,
+        });
+        return Ok(());
+    };
+
+    if leaf == bin_rel {
+        return Ok(());
+    }
+
+    events.push(RewriteEvent {
+        pass: "entrypoint-normalization".to_string(),
+        file: bin_rel.to_string(),
+        action: "normalize-wrapped-entrypoint".to_string(),
+        from: Some(format!("{}.wrapped", bin_rel)),
+        to: Some(bin_rel.to_string()),
+        note: Some(format!("leaf={leaf}")),
     });
 
     Ok(())

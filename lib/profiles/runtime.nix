@@ -24,6 +24,65 @@ let
   '';
 in
 rec {
+  ##@ name: dhcpClient
+  ##@ path: lib.profiles.runtime.dhcpClient
+  ##@ kind: function
+  ##@ summary: Add a boot-time DHCP client service that brings up an interface and acquires an IPv4 lease.
+  ##@ param: interface string? Interface name to configure. When null, the first non-loopback interface is selected.
+  ##@ param: descriptionPrefix string? Prefix used in the generated service description.
+  ##@ param: dependsOnUdev bool? Add udev and udev-trigger service dependencies before starting DHCP.
+  ##@ returns: Fragment that installs dhcpcd and a boot service for guest networking.
+  ##@ example: antinixLib.profiles.runtime.dhcpClient { interface = "eth0"; }
+  dhcpClient =
+    {
+      interface ? null,
+      descriptionPrefix ? "Antinix",
+      dependsOnUdev ? true,
+    }:
+    {
+      packages = [
+        pkgs.dhcpcd
+        pkgs.iproute2
+      ];
+
+      services.dhcp-client = schema.mkService {
+        description = "${descriptionPrefix} DHCP client";
+        restart = "none";
+        dependsOn = lib.optionals dependsOnUdev [
+          "udevd"
+          "udev-trigger"
+        ];
+        wantedBy = [ "boot" ];
+        command = [
+          "/bin/sh"
+          "-c"
+          ''
+            set -eu
+
+            iface=${lib.escapeShellArg (if interface != null then interface else "")}
+            if [ -z "$iface" ]; then
+              for path in /sys/class/net/*; do
+                candidate="$(basename "$path")"
+                if [ "$candidate" = "lo" ]; then
+                  continue
+                fi
+                iface="$candidate"
+                break
+              done
+            fi
+
+            if [ -z "$iface" ]; then
+              echo "dhcp-client: no non-loopback interface found" >&2
+              exit 1
+            fi
+
+              /usr/bin/ip link set "$iface" up
+              exec /usr/bin/dhcpcd --nobackground --quiet --waitip 4 --ipv4only "$iface"
+          ''
+        ];
+      };
+    };
+
   ##@ name: udev
   ##@ path: lib.profiles.runtime.udev
   ##@ kind: function
@@ -134,4 +193,19 @@ rec {
       ++ lib.optional enableFontconfig (fontconfig { })
       ++ lib.optional enableXkb (xkb { })
     );
+
+  ##@ name: opengl
+  ##@ path: lib.profiles.runtime.opengl
+  ##@ kind: function
+  ##@ summary: Add a Mesa userspace OpenGL runtime including DRI, GBM, EGL vendor, and Vulkan ICD files.
+  ##@ param: driversPackage derivation? Package providing the userspace graphics driver tree.
+  ##@ returns: Fragment that installs a Mesa-style graphics driver runtime into the rootfs.
+  ##@ example: antinixLib.profiles.runtime.opengl { }
+  opengl =
+    {
+      driversPackage ? pkgs.mesa,
+    }:
+    {
+      packages = [ driversPackage ];
+    };
 }

@@ -97,6 +97,12 @@ let
     install_detected_interpreter_to = "/lib64";
   };
 
+  defaultOpaqueData = {
+    policy = "deterministic_tiers";
+    shared_root = "/usr/share/antinix/vendor";
+    fallback_root = "/usr/lib/antinix/store";
+  };
+
   defaultValidation = {
     forbid_absolute_store_symlinks = true;
     forbid_absolute_internal_symlinks = true;
@@ -225,6 +231,12 @@ in
         normalize_runtime_layout = true;
       };
 
+      opaqueData = defaultOpaqueData // {
+        policy = patching.opaqueDataPolicy or defaultOpaqueData.policy;
+        shared_root = patching.opaqueDataSharedRoot or defaultOpaqueData.shared_root;
+        fallback_root = patching.opaqueDataFallbackRoot or defaultOpaqueData.fallback_root;
+      };
+
       expectedInterpreter = validationIn.expectedInterpreter or (chooseExpectedInterpreter runtimeLayout);
 
       validation = defaultValidation // {
@@ -285,6 +297,7 @@ in
       forbidden_store_paths = forbiddenStorePaths;
 
       runtime_layout = runtimeLayout;
+      opaque_data = opaqueData;
       validation = validation;
       chmod = chmod;
       debug = debug;

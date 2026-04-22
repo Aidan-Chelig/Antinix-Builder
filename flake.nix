@@ -286,6 +286,18 @@ libFor =
                 name = "vm-${variantName}";
                 value = vm;
               }
+              {
+                name = "merge-plan-${variantName}";
+                value = variant.mergePlan;
+              }
+              {
+                name = "rewrite-plan-${variantName}";
+                value = variant.rewritePlan;
+              }
+              {
+                name = "process-plan-${variantName}";
+                value = variant.processPlan;
+              }
             ];
 
           variantPackages =

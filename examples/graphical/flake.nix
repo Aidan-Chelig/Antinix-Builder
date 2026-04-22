@@ -62,6 +62,7 @@
             graphics = true;
             serialConsole = false;
             enableUdev = true;
+            enableDhcp = true;
             descriptionPrefix = "Graphical example";
           })
           (antinixLib.profiles.graphical.labwcVm {
@@ -74,7 +75,6 @@
             extraPackages = [
               pkgs.dejavu_fonts
               pkgs.wmenu
-              pkgs.superTuxKart
             ];
           })
         ];
@@ -121,6 +121,11 @@
     {
       packages.${system} = {
         default = demoSystem.image;
+        inherit (demoSystem)
+          mergePlan
+          rewritePlan
+          processPlan
+          ;
         inherit vm;
       };
 

@@ -29,7 +29,11 @@ pub fn auto_patch_elfs(
     Ok(())
 }
 
-pub fn normalize_embedded_store_path(root: &Path, s: &str) -> Option<String> {
+pub fn normalize_embedded_store_path(
+    root: &Path,
+    s: &str,
+    cfg: &crate::model::CompiledConfig,
+) -> Option<String> {
     if !s.starts_with(STORE_REF) {
         return None;
     }
@@ -43,7 +47,19 @@ pub fn normalize_embedded_store_path(root: &Path, s: &str) -> Option<String> {
         }
     }
 
-    let opaque_candidate = format!("/usr/lib/antinix/store/{store_basename}{suffix}");
+    let shared_candidate = format!(
+        "{}/{store_basename}{suffix}",
+        cfg.raw.opaque_data.shared_root.trim_end_matches('/')
+    );
+    let shared_abs = root.join(shared_candidate.trim_start_matches('/'));
+    if shared_abs.exists() {
+        return Some(shared_candidate);
+    }
+
+    let opaque_candidate = format!(
+        "{}/{store_basename}{suffix}",
+        cfg.raw.opaque_data.fallback_root.trim_end_matches('/')
+    );
     let opaque_abs = root.join(opaque_candidate.trim_start_matches('/'));
     if opaque_abs.exists() {
         Some(opaque_candidate)
@@ -623,7 +639,7 @@ fn temp_sibling_path(path: &Path) -> PathBuf {
     parent.join(format!(".{name}.rootfs-patcher.tmp"))
 }
 
-fn should_skip_auto_elf_patch(path: &Path, base: &str, elf: &goblin::elf::Elf) -> bool {
+pub(crate) fn should_skip_auto_elf_patch(path: &Path, base: &str, elf: &goblin::elf::Elf) -> bool {
     use goblin::elf::header::{ET_DYN, ET_EXEC, ET_REL};
 
     let path_str = path.to_string_lossy();

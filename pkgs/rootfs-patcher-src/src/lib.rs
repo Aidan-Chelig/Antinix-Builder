@@ -11,9 +11,15 @@ pub mod app {
                 root,
                 config,
                 allowed_prefixes_file,
+                dry_run,
             } => {
                 let cfg = config::load_config(&config, allowed_prefixes_file.as_deref())?;
-                crate::patch::rewrite::process_root(&root, &cfg)?;
+                if dry_run {
+                    let events = crate::patch::rewrite::plan_root(&root, &cfg)?;
+                    output::print_rewrite_events(&events);
+                } else {
+                    crate::patch::rewrite::process_root(&root, &cfg)?;
+                }
 
                 let findings = crate::analysis::scan::scan_root(&root, &cfg)?;
                 output::print_findings(&findings);
@@ -26,9 +32,15 @@ pub mod app {
                 root,
                 config,
                 allowed_prefixes_file,
+                dry_run,
             } => {
                 let cfg = config::load_config(&config, allowed_prefixes_file.as_deref())?;
-                crate::patch::rewrite::process_root(&root, &cfg)?;
+                if dry_run {
+                    let events = crate::patch::rewrite::plan_root(&root, &cfg)?;
+                    output::print_rewrite_events(&events);
+                } else {
+                    crate::patch::rewrite::process_root(&root, &cfg)?;
+                }
             }
             cli::Command::Scan {
                 root,
@@ -49,10 +61,28 @@ pub mod app {
             }
             cli::Command::Merge {
                 root,
+                config,
                 closure_paths_file,
                 data_dirs,
+                dry_run,
             } => {
-                crate::fs::merge::merge_closure_into_root(&root, &closure_paths_file, &data_dirs)?;
+                let cfg = config::load_config(&config, None)?;
+                if dry_run {
+                    let events = crate::fs::merge::plan_merge_closure_into_root(
+                        &root,
+                        &closure_paths_file,
+                        &data_dirs,
+                        &cfg,
+                    )?;
+                    output::print_rewrite_events(&events);
+                } else {
+                    crate::fs::merge::merge_closure_into_root(
+                        &root,
+                        &closure_paths_file,
+                        &data_dirs,
+                        &cfg,
+                    )?;
+                }
             }
         }
 

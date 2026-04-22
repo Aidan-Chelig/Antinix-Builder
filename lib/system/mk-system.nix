@@ -114,7 +114,7 @@ in
 ##@ param: buildBootImage bool? Build a raw UEFI bootable disk image using the configured boot metadata, kernel image, and initrd.
 ##@ param: kernelImage path? Kernel image copied into the EFI partition when `buildBootImage = true`.
 ##@ param: initrd path? Initrd copied into the EFI partition when `buildBootImage = true`.
-##@ returns: attrset containing config, normalizedSpec, rootfs, tarball, image, bootImage, and meta.
+##@ returns: attrset containing config, normalizedSpec, rootfs, tarball, image, bootImage, dry-run helper launchers (`mergePlan`, `rewritePlan`, `processPlan`), debug helpers, and meta.
 ##@ example: antinixLib.mkSystem { name = "demo"; init = "openrc"; packageManager = "xbps"; buildImage = true; nixosSystem = kernelSystem; }
 
 args@{
@@ -340,7 +340,7 @@ let
 
   image =
     if buildImage && mkRootfsImage != null then
-      mkRootfsImage {
+      mkRootfsImage ({
         rootfsTarball =
           if tarball != null then
             tarball
@@ -354,9 +354,10 @@ let
             };
         name = systemName;
         volumeLabel = systemName;
-        inherit imageSize;
         debug = normalizedSpec.debug or { };
-      }
+      } // lib.optionalAttrs (imageSize != null) {
+        inherit imageSize;
+      })
     else
       null;
 
@@ -369,7 +370,7 @@ let
           if image != null then
             image
           else
-            mkRootfsImage {
+            mkRootfsImage ({
               rootfsTarball =
                 if tarball != null then
                   tarball
@@ -383,9 +384,10 @@ let
                   };
               name = systemName;
               volumeLabel = systemName;
-              inherit imageSize;
               debug = normalizedSpec.debug or { };
-            };
+            } // lib.optionalAttrs (imageSize != null) {
+              inherit imageSize;
+            });
       in
       assert kernelImage != null || throw "mkSystem: `kernelImage` is required when `buildBootImage = true`";
       assert initrd != null || throw "mkSystem: `initrd` is required when `buildBootImage = true`";
@@ -415,7 +417,27 @@ in
     bootImage
     ;
 
+  inherit (rootfs.patcherDebug or (rootfs.passthru.patcherDebug or { }))
+    mergePlan
+    rewritePlan
+    processPlan
+    ;
+
   config = normalizedSpec;
+
+  ##@ name: debug
+  ##@ path: system.debug
+  ##@ kind: module
+  ##@ summary: Debug helpers derived from the built system artifacts.
+  ##@ returns: Attrset exposing rootfs patcher dry-run helpers and patcher input paths.
+  debug = {
+    ##@ name: patcher
+    ##@ path: system.debug.patcher
+    ##@ kind: module
+    ##@ summary: Prewired rootfs-patcher debug inputs and dry-run launchers for this system's rootfs tree.
+    ##@ returns: Attrset exposing `mergePlan`, `rewritePlan`, `processPlan`, and the generated config/input paths.
+    patcher = rootfs.patcherDebug or (rootfs.passthru.patcherDebug or { });
+  };
 
   meta = (normalizedSpec.meta or { }) // {
     systemName = systemName;

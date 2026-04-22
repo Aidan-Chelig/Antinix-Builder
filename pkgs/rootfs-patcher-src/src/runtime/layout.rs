@@ -31,6 +31,41 @@ pub fn normalize_runtime_layout(
     Ok(())
 }
 
+pub fn plan_runtime_layout(root: &Path, cfg: &CompiledConfig) -> Result<Vec<RewriteEvent>> {
+    let rl = &cfg.raw.runtime_layout;
+    if !rl.normalize_runtime_layout {
+        return Ok(Vec::new());
+    }
+
+    let detected = detect_interpreter(root, cfg)?.with_context(
+        || "runtime layout normalization requested, but no ELF interpreter could be detected",
+    )?;
+
+    let mut events = Vec::new();
+    plan_rebuild_runtime_dirs(root, rl.lib_roots.as_slice(), "/lib", &mut events)?;
+    plan_rebuild_runtime_dirs(root, rl.lib64_roots.as_slice(), "/lib64", &mut events)?;
+
+    if let Some(dest_dir) = rl.install_detected_interpreter_to.as_deref() {
+        let src_abs = resolve_detected_interpreter_source(root, &detected)?;
+        let base = Path::new(&detected)
+            .file_name()
+            .map(|x| x.to_string_lossy().into_owned())
+            .with_context(|| format!("detected interpreter has no basename: {detected}"))?;
+        let dest_dir_rel = normalize_rel_string(dest_dir);
+        let dest_abs = root.join(dest_dir_rel.trim_start_matches('/')).join(base);
+        events.push(RewriteEvent {
+            pass: "runtime-layout".to_string(),
+            file: dest_dir_rel,
+            action: "install-detected-interpreter".to_string(),
+            from: Some(src_abs.display().to_string()),
+            to: Some(dest_abs.display().to_string()),
+            note: Some(detected),
+        });
+    }
+
+    Ok(events)
+}
+
 fn detect_interpreter(root: &Path, cfg: &CompiledConfig) -> Result<Option<String>> {
     let rl = &cfg.raw.runtime_layout;
 
@@ -216,6 +251,100 @@ fn rebuild_runtime_dirs(
             Some(modules_abs.display().to_string()),
             None,
         );
+    }
+
+    Ok(())
+}
+
+fn plan_rebuild_runtime_dirs(
+    root: &Path,
+    sources: &[String],
+    dest_rel: &str,
+    events: &mut Vec<RewriteEvent>,
+) -> Result<()> {
+    let dest_rel = normalize_rel_string(dest_rel);
+    let dest_abs = root.join(dest_rel.trim_start_matches('/'));
+    let modules_abs = dest_abs.join("modules");
+
+    if modules_abs.exists() {
+        let preserved = root
+            .join("debug/.preserve-modules")
+            .join(dest_rel.trim_start_matches('/').replace('/', "_"));
+        events.push(RewriteEvent {
+            pass: "runtime-layout".to_string(),
+            file: dest_rel.clone(),
+            action: "preserve-modules".to_string(),
+            from: Some(modules_abs.display().to_string()),
+            to: Some(preserved.display().to_string()),
+            note: None,
+        });
+    }
+
+    if dest_abs.exists() {
+        let meta = fs::symlink_metadata(&dest_abs)
+            .with_context(|| format!("failed to stat {}", dest_abs.display()))?;
+        let action = if meta.file_type().is_dir() && !meta.file_type().is_symlink() {
+            "remove-dir"
+        } else {
+            "remove-path"
+        };
+        events.push(RewriteEvent {
+            pass: "runtime-layout".to_string(),
+            file: dest_rel.clone(),
+            action: action.to_string(),
+            from: None,
+            to: None,
+            note: None,
+        });
+    }
+
+    events.push(RewriteEvent {
+        pass: "runtime-layout".to_string(),
+        file: dest_rel.clone(),
+        action: "create-dir".to_string(),
+        from: None,
+        to: None,
+        note: None,
+    });
+
+    for src_rel in sources {
+        let src_rel = normalize_rel_string(src_rel);
+        let src_abs = root.join(src_rel.trim_start_matches('/'));
+        if !src_abs.exists() {
+            continue;
+        }
+
+        let meta = fs::symlink_metadata(&src_abs)
+            .with_context(|| format!("failed to stat {}", src_abs.display()))?;
+        if !meta.file_type().is_dir() {
+            bail!(
+                "runtime layout source is not a directory: {}",
+                src_abs.display()
+            );
+        }
+
+        events.push(RewriteEvent {
+            pass: "runtime-layout".to_string(),
+            file: dest_rel.clone(),
+            action: "merge-runtime-source".to_string(),
+            from: Some(src_rel),
+            to: Some(dest_rel.clone()),
+            note: None,
+        });
+    }
+
+    if modules_abs.exists() {
+        let preserved = root
+            .join("debug/.preserve-modules")
+            .join(dest_rel.trim_start_matches('/').replace('/', "_"));
+        events.push(RewriteEvent {
+            pass: "runtime-layout".to_string(),
+            file: dest_rel,
+            action: "restore-modules".to_string(),
+            from: Some(preserved.display().to_string()),
+            to: Some(modules_abs.display().to_string()),
+            note: None,
+        });
     }
 
     Ok(())

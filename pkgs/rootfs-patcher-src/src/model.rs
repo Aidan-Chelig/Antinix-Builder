@@ -130,6 +130,25 @@ pub struct RuntimeLayoutConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum OpaqueDataPolicy {
+    #[default]
+    DeterministicTiers,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct OpaqueDataConfig {
+    #[serde(default)]
+    pub policy: OpaqueDataPolicy,
+
+    #[serde(default)]
+    pub shared_root: String,
+
+    #[serde(default)]
+    pub fallback_root: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
 pub struct Config {
     #[serde(default)]
     pub auto_patch: AutoPatchConfig,
@@ -153,6 +172,9 @@ pub struct Config {
     pub forbidden_store_paths: Vec<String>,
     #[serde(default)]
     pub runtime_layout: RuntimeLayoutConfig,
+
+    #[serde(default)]
+    pub opaque_data: OpaqueDataConfig,
 
     #[serde(default)]
     pub validation: ValidationConfig,

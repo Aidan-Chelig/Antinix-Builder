@@ -116,6 +116,11 @@
     {
       packages.${system} = {
         default = demoSystem.image;
+        inherit (demoSystem)
+          mergePlan
+          rewritePlan
+          processPlan
+          ;
         inherit vm;
       };
 

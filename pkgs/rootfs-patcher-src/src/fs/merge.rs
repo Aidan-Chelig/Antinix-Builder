@@ -1,15 +1,17 @@
+use crate::model::{CompiledConfig, OpaqueDataPolicy, RewriteEvent};
 use anyhow::{Context, Result};
 use rayon::prelude::*;
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 const RUNTIME_CATEGORY_ROOTS: [&str; 6] = ["bin", "sbin", "lib", "lib64", "libexec", "share"];
-const OPAQUE_STORE_DEST_ROOT: &str = "usr/lib/antinix/store";
 
 pub fn merge_closure_into_root(
     root: &Path,
     closure_paths_file: &Path,
     data_dirs: &[String],
+    cfg: &CompiledConfig,
 ) -> Result<()> {
     let closure_paths = fs::read_to_string(closure_paths_file)
         .with_context(|| format!("failed to read {}", closure_paths_file.display()))?;
@@ -34,7 +36,7 @@ pub fn merge_closure_into_root(
     }
 
     for src_root in &sources {
-        materialize_opaque_runtime_root(src_root, root)?;
+        materialize_opaque_runtime_root(src_root, root, cfg)?;
     }
 
     // Convenience mirrors like the old shell did.
@@ -59,7 +61,81 @@ pub fn merge_closure_into_root(
     Ok(())
 }
 
-fn materialize_opaque_runtime_root(src_root: &Path, root: &Path) -> Result<()> {
+pub fn plan_merge_closure_into_root(
+    root: &Path,
+    closure_paths_file: &Path,
+    data_dirs: &[String],
+    cfg: &CompiledConfig,
+) -> Result<Vec<RewriteEvent>> {
+    let closure_paths = fs::read_to_string(closure_paths_file)
+        .with_context(|| format!("failed to read {}", closure_paths_file.display()))?;
+
+    let sources: Vec<PathBuf> = closure_paths
+        .lines()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .collect();
+
+    let mut events = Vec::new();
+
+    for (rel, dest) in [
+        ("bin", "usr/bin"),
+        ("sbin", "usr/sbin"),
+        ("lib", "usr/lib"),
+        ("lib64", "usr/lib64"),
+        ("libexec", "usr/libexec"),
+    ] {
+        plan_merge_category(&sources, root, rel, Path::new(dest), &mut events)?;
+    }
+
+    for rel in data_dirs {
+        let dest = map_data_dir_dest(rel);
+        plan_merge_category(
+            &sources,
+            root,
+            rel,
+            Path::new(dest.trim_start_matches('/')),
+            &mut events,
+        )?;
+    }
+
+    for src_root in &sources {
+        plan_opaque_runtime_root(src_root, root, cfg, &mut events)?;
+    }
+
+    for x in [
+        "sh", "bash", "env", "ls", "cat", "echo", "pwd", "mkdir", "uname", "date", "mount",
+        "umount", "cp", "mv", "rm", "chmod", "chown", "ln", "readlink", "mknod",
+    ] {
+        let src = root.join("usr/bin").join(x);
+        let dst = root.join("bin").join(x);
+        if src.exists() && !dst.exists() {
+            events.push(RewriteEvent {
+                pass: "merge".to_string(),
+                file: dst.display().to_string(),
+                action: "mirror-convenience-binary".to_string(),
+                from: Some(src.display().to_string()),
+                to: Some(dst.display().to_string()),
+                note: None,
+            });
+        }
+    }
+
+    Ok(events)
+}
+
+enum OpaquePlacement<'a> {
+    SharedData(&'a str),
+    Fallback(&'a str),
+}
+
+fn plan_opaque_runtime_root(
+    src_root: &Path,
+    root: &Path,
+    cfg: &CompiledConfig,
+    events: &mut Vec<RewriteEvent>,
+) -> Result<()> {
     if !src_root.is_dir() {
         return Ok(());
     }
@@ -77,7 +153,8 @@ fn materialize_opaque_runtime_root(src_root: &Path, root: &Path) -> Result<()> {
     }
 
     let has_runtime_category = entries.iter().any(|entry| {
-        entry.file_name()
+        entry
+            .file_name()
             .and_then(|name| name.to_str())
             .map(|name| RUNTIME_CATEGORY_ROOTS.contains(&name))
             .unwrap_or(false)
@@ -91,7 +168,67 @@ fn materialize_opaque_runtime_root(src_root: &Path, root: &Path) -> Result<()> {
         return Ok(());
     };
 
-    let dest = root.join(OPAQUE_STORE_DEST_ROOT).join(base_name);
+    let opaque_cfg = &cfg.raw.opaque_data;
+    let placement = classify_opaque_runtime_root(src_root, opaque_cfg);
+    let (dest_root, note) = match placement {
+        OpaquePlacement::SharedData(path) => (path, "shared-data"),
+        OpaquePlacement::Fallback(path) => (path, "fallback"),
+    };
+    let dest = root.join(dest_root.trim_start_matches('/')).join(base_name);
+    events.push(RewriteEvent {
+        pass: "merge".to_string(),
+        file: src_root.display().to_string(),
+        action: "materialize-opaque-runtime-root".to_string(),
+        from: Some(src_root.display().to_string()),
+        to: Some(dest.display().to_string()),
+        note: Some(note.to_string()),
+    });
+    Ok(())
+}
+
+fn materialize_opaque_runtime_root(
+    src_root: &Path,
+    root: &Path,
+    cfg: &CompiledConfig,
+) -> Result<()> {
+    if !src_root.is_dir() {
+        return Ok(());
+    }
+
+    let entries: Vec<PathBuf> = fs::read_dir(src_root)
+        .with_context(|| format!("failed to read directory {}", src_root.display()))?
+        .map(|e| {
+            e.map(|x| x.path())
+                .with_context(|| format!("failed reading entry in {}", src_root.display()))
+        })
+        .collect::<Result<_>>()?;
+
+    if entries.is_empty() {
+        return Ok(());
+    }
+
+    let has_runtime_category = entries.iter().any(|entry| {
+        entry
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| RUNTIME_CATEGORY_ROOTS.contains(&name))
+            .unwrap_or(false)
+    });
+
+    if has_runtime_category {
+        return Ok(());
+    }
+
+    let Some(base_name) = src_root.file_name() else {
+        return Ok(());
+    };
+
+    let opaque_cfg = &cfg.raw.opaque_data;
+    let placement = classify_opaque_runtime_root(src_root, opaque_cfg);
+    let dest_root = match placement {
+        OpaquePlacement::SharedData(path) | OpaquePlacement::Fallback(path) => path,
+    };
+    let dest = root.join(dest_root.trim_start_matches('/')).join(base_name);
     if dest.exists() {
         let meta = fs::symlink_metadata(&dest)
             .with_context(|| format!("failed to stat {}", dest.display()))?;
@@ -106,12 +243,116 @@ fn materialize_opaque_runtime_root(src_root: &Path, root: &Path) -> Result<()> {
     Ok(())
 }
 
+fn classify_opaque_runtime_root<'a>(
+    src_root: &Path,
+    opaque_cfg: &'a crate::model::OpaqueDataConfig,
+) -> OpaquePlacement<'a> {
+    match opaque_cfg.policy {
+        OpaqueDataPolicy::DeterministicTiers => {
+            if is_shared_data_candidate(src_root).unwrap_or(false) {
+                OpaquePlacement::SharedData(&opaque_cfg.shared_root)
+            } else {
+                OpaquePlacement::Fallback(&opaque_cfg.fallback_root)
+            }
+        }
+    }
+}
+
+fn is_shared_data_candidate(root: &Path) -> Result<bool> {
+    let entries: Vec<PathBuf> = fs::read_dir(root)
+        .with_context(|| format!("failed to read directory {}", root.display()))?
+        .map(|e| {
+            e.map(|x| x.path())
+                .with_context(|| format!("failed reading entry in {}", root.display()))
+        })
+        .collect::<Result<_>>()?;
+
+    if entries.is_empty() {
+        return Ok(false);
+    }
+
+    for path in entries {
+        if !is_data_like_path(&path)? {
+            return Ok(false);
+        }
+    }
+
+    Ok(true)
+}
+
+fn is_data_like_path(path: &Path) -> Result<bool> {
+    let meta = fs::metadata(path).with_context(|| format!("failed to stat {}", path.display()))?;
+
+    if meta.is_dir() {
+        let entries: Vec<PathBuf> = fs::read_dir(path)
+            .with_context(|| format!("failed to read directory {}", path.display()))?
+            .map(|e| {
+                e.map(|x| x.path())
+                    .with_context(|| format!("failed reading entry in {}", path.display()))
+            })
+            .collect::<Result<_>>()?;
+
+        for child in entries {
+            if !is_data_like_path(&child)? {
+                return Ok(false);
+            }
+        }
+
+        return Ok(true);
+    }
+
+    if meta.is_file() {
+        if meta.permissions().mode() & 0o111 != 0 {
+            return Ok(false);
+        }
+
+        let bytes = fs::read(path).with_context(|| format!("failed to read {}", path.display()))?;
+        if bytes.starts_with(b"\x7fELF") {
+            return Ok(false);
+        }
+    }
+
+    Ok(true)
+}
+
 fn map_data_dir_dest(rel: &str) -> String {
     if rel == "share" || rel.starts_with("share/") {
         format!("/usr/{rel}")
     } else {
         format!("/{rel}")
     }
+}
+
+fn plan_merge_category(
+    sources: &[PathBuf],
+    root: &Path,
+    rel: &str,
+    dest_rel: &Path,
+    events: &mut Vec<RewriteEvent>,
+) -> Result<()> {
+    let dest_abs = root.join(dest_rel);
+    for src_root in sources {
+        let src = src_root.join(rel);
+        if !src.exists() {
+            continue;
+        }
+
+        let meta = fs::symlink_metadata(&src)
+            .with_context(|| format!("failed to stat {}", src.display()))?;
+        if !meta.is_dir() {
+            continue;
+        }
+
+        events.push(RewriteEvent {
+            pass: "merge".to_string(),
+            file: src.display().to_string(),
+            action: "merge-category".to_string(),
+            from: Some(src.display().to_string()),
+            to: Some(dest_abs.display().to_string()),
+            note: Some(rel.to_string()),
+        });
+    }
+    Ok(())
 }
 
 fn merge_category(sources: &[PathBuf], root: &Path, rel: &str, dest_rel: &Path) -> Result<()> {

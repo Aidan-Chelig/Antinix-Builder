@@ -1,5 +1,5 @@
 use crate::autopatch::normalize_embedded_store_path;
-use crate::model::{DetectedRuntimeFamily, FileKind, RewriteLog, RewriteStrategy};
+use crate::model::{CompiledConfig, DetectedRuntimeFamily, FileKind, RewriteLog, RewriteStrategy};
 use crate::scan::classify_bytes;
 use anyhow::{Context, Result};
 use goblin::Object;
@@ -14,15 +14,21 @@ use super::classification::classify_file;
 pub(super) fn rewrite_embedded_store_paths(
     root: &Path,
     files: &[(std::path::PathBuf, String)],
+    cfg: &CompiledConfig,
     log: &Arc<RewriteLog>,
 ) -> Result<()> {
     files
         .par_iter()
-        .try_for_each(|(abs, _)| rewrite_embedded_store_paths_one(root, abs, log))
+        .try_for_each(|(abs, _)| rewrite_embedded_store_paths_one(root, abs, cfg, log))
         .context("embedded store-path rewrite pass failed")
 }
 
-fn rewrite_embedded_store_paths_one(root: &Path, path: &Path, log: &Arc<RewriteLog>) -> Result<()> {
+fn rewrite_embedded_store_paths_one(
+    root: &Path,
+    path: &Path,
+    cfg: &CompiledConfig,
+    log: &Arc<RewriteLog>,
+) -> Result<()> {
     let bytes = fs::read(path).with_context(|| format!("failed to read {}", path.display()))?;
     let rel = crate::paths::rel_from_root(root, path)?;
     let classification = classify_file(path, &rel, &bytes);
@@ -73,13 +79,15 @@ fn rewrite_embedded_store_paths_one(root: &Path, path: &Path, log: &Arc<RewriteL
                 return Ok(());
             }
 
-            rewrite_embedded_store_paths_elf(root, path, input, &finder, &ranges)
+            rewrite_embedded_store_paths_elf(root, path, input, &finder, &ranges, cfg, log)
         }
         _ => match classify_bytes(&input) {
             FileKind::Binary => {
-                rewrite_embedded_store_paths_binary(root, path, input, &finder, log)
+                rewrite_embedded_store_paths_binary(root, path, input, &finder, cfg, log)
             }
-            FileKind::Text => rewrite_embedded_store_paths_text(root, path, input, &finder),
+            FileKind::Text => {
+                rewrite_embedded_store_paths_text(root, path, input, &finder, cfg, log)
+            }
         },
     }
 }
@@ -90,6 +98,8 @@ fn rewrite_embedded_store_paths_elf(
     mut data: Vec<u8>,
     finder: &Finder,
     ranges: &[(usize, usize)],
+    cfg: &CompiledConfig,
+    log: &Arc<RewriteLog>,
 ) -> Result<()> {
     let mut changed = false;
     let mut cursor = 0usize;
@@ -113,7 +123,7 @@ fn rewrite_embedded_store_paths_elf(
             }
         };
 
-        let Some(new) = normalize_embedded_store_path(root, &old) else {
+        let Some(new) = normalize_embedded_store_path(root, &old, cfg) else {
             cursor = end.max(start + STORE_REF_LEN);
             continue;
         };
@@ -133,6 +143,14 @@ fn rewrite_embedded_store_paths_elf(
 
         data[start..start + old.len()].copy_from_slice(&replacement);
         changed = true;
+        log.push(crate::model::RewriteEvent {
+            pass: "embedded-elf".to_string(),
+            file: path.display().to_string(),
+            action: "elf-embedded-rewrite".to_string(),
+            from: Some(old.clone()),
+            to: Some(new.clone()),
+            note: None,
+        });
 
         cursor = end.max(start + STORE_REF_LEN);
     }
@@ -149,6 +167,7 @@ fn rewrite_embedded_store_paths_binary(
     path: &Path,
     mut data: Vec<u8>,
     finder: &Finder,
+    cfg: &CompiledConfig,
     log: &Arc<RewriteLog>,
 ) -> Result<()> {
     let mut changed = false;
@@ -167,7 +186,7 @@ fn rewrite_embedded_store_paths_binary(
             }
         };
 
-        let Some(new) = normalize_embedded_store_path(root, &old) else {
+        let Some(new) = normalize_embedded_store_path(root, &old, cfg) else {
             cursor = end.max(start + STORE_REF_LEN);
             continue;
         };
@@ -214,6 +233,8 @@ fn rewrite_embedded_store_paths_text(
     path: &Path,
     input: Vec<u8>,
     finder: &Finder,
+    cfg: &CompiledConfig,
+    log: &Arc<RewriteLog>,
 ) -> Result<()> {
     let mut changed = false;
     let mut cursor = 0usize;
@@ -226,9 +247,17 @@ fn rewrite_embedded_store_paths_text(
         out.extend_from_slice(&input[cursor..start]);
 
         let replacement: &[u8] = match std::str::from_utf8(&input[start..end]) {
-            Ok(old) => match normalize_embedded_store_path(root, old) {
+            Ok(old) => match normalize_embedded_store_path(root, old, cfg) {
                 Some(new) => {
                     changed = true;
+                    log.push(crate::model::RewriteEvent {
+                        pass: "embedded-text".to_string(),
+                        file: path.display().to_string(),
+                        action: "text-embedded-rewrite".to_string(),
+                        from: Some(old.to_string()),
+                        to: Some(new.clone()),
+                        note: None,
+                    });
                     out.extend_from_slice(new.as_bytes());
                     cursor = end;
                     continue;

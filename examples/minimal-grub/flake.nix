@@ -139,6 +139,11 @@
         default = demoSystem.bootImage;
         bootImage = demoSystem.bootImage;
         rootfsImage = demoSystem.image;
+        inherit (demoSystem)
+          mergePlan
+          rewritePlan
+          processPlan
+          ;
         inherit vm;
       };
 

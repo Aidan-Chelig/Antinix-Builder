@@ -127,6 +127,8 @@ rec {
   ##@ param: terminal string? Terminal command launched from Labwc autostart.
   ##@ param: terminalPackage derivation? Package added to the closure for the configured terminal command.
   ##@ param: extraSessionEnv attrset? Additional environment variables exported into the session.
+  ##@ param: enableOpenGL bool? Install a Mesa userspace OpenGL driver runtime for graphical applications.
+  ##@ param: softwareOpenGL bool? Force Mesa to use software rendering defaults inside the VM session.
   ##@ param: softwareRendering bool? Enable pixman rendering defaults for VM compatibility.
   ##@ param: softwareCursor bool? Force software cursor rendering for VM compatibility.
   ##@ param: home string? Home directory used by the session helper.
@@ -141,6 +143,8 @@ rec {
       terminal ? "/usr/bin/foot",
       terminalPackage ? pkgs.foot,
       extraSessionEnv ? { },
+      enableOpenGL ? true,
+      softwareOpenGL ? true,
       softwareRendering ? true,
       softwareCursor ? true,
       home ? if user == "root" then "/root" else "/home/${user}",
@@ -156,33 +160,43 @@ rec {
           FONTCONFIG_PATH = "/etc/fonts";
           FONTCONFIG_FILE = "/etc/fonts/fonts.conf";
           XKB_CONFIG_ROOT = "/usr/share/X11/xkb";
+          LIBGL_DRIVERS_PATH = "/usr/lib/dri";
+          GBM_BACKENDS_PATH = "/usr/lib/gbm";
+          __EGL_VENDOR_LIBRARY_DIRS = "/usr/share/glvnd/egl_vendor.d";
+        }
+        // lib.optionalAttrs softwareOpenGL {
+          LIBGL_ALWAYS_SOFTWARE = "1";
+          GALLIUM_DRIVER = "llvmpipe";
         }
         // (wlrootsVmCompat {
           inherit softwareRendering softwareCursor;
         })
         // extraSessionEnv;
     in
-    merge.mergeMany [
-      (runtime.udev {
-        descriptionPrefix = "Labwc VM";
-      })
-      (runtime.graphicalBase { })
-      (seatd {
-        user = "root";
-        group = "root";
-      })
-      (sessions.ttyAutologinWayland {
-        inherit user tty home group;
-        command = [ "/usr/bin/labwc" ];
-        environment = labwcEnvironment;
-        dbusSession = true;
-        extraDirectories = [
-          "${home}/.cache"
-          "${home}/.cache/fontconfig"
-        ];
-      })
-      (labwc {
-        inherit terminal terminalPackage extraPackages;
-      })
-    ];
+    merge.mergeMany (
+      [
+        (runtime.udev {
+          descriptionPrefix = "Labwc VM";
+        })
+        (runtime.graphicalBase { })
+        (seatd {
+          user = "root";
+          group = "root";
+        })
+        (sessions.ttyAutologinWayland {
+          inherit user tty home group;
+          command = [ "/usr/bin/labwc" ];
+          environment = labwcEnvironment;
+          dbusSession = true;
+          extraDirectories = [
+            "${home}/.cache"
+            "${home}/.cache/fontconfig"
+          ];
+        })
+        (labwc {
+          inherit terminal terminalPackage extraPackages;
+        })
+      ]
+      ++ lib.optional enableOpenGL (runtime.opengl { })
+    );
 }

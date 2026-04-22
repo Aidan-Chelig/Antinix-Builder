@@ -70,6 +70,10 @@ let
         normalizeStorePaths = true;
         rewriteInterpreter = true;
       };
+
+      opaqueDataPolicy = "deterministic_tiers";
+      opaqueDataSharedRoot = "/usr/share/antinix/vendor";
+      opaqueDataFallbackRoot = "/usr/lib/antinix/store";
     };
 
     validation = {

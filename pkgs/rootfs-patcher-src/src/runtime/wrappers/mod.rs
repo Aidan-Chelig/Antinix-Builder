@@ -81,6 +81,17 @@ pub fn detect_runtime_plan(root: &Path) -> Result<RuntimePlan> {
     plans::detect_runtime_plan(root)
 }
 
+pub fn plan_runtime_wrappers(root: &Path) -> Result<Vec<crate::model::RewriteEvent>> {
+    plans::plan_runtime_wrappers(root)
+}
+
+pub fn plan_public_entrypoint_imports(
+    root: &Path,
+    artifact_index: &ArtifactIndex,
+) -> Result<Vec<crate::model::RewriteEvent>> {
+    entrypoints::plan_public_entrypoint_imports(root, artifact_index)
+}
+
 pub fn extract_shell_exec_target(bytes: &[u8]) -> Option<String> {
     entrypoints::extract_shell_exec_target(bytes)
 }
